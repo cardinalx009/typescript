@@ -85,7 +85,7 @@ export default function Login({ onAuth }: LoginProps) {
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center justify-center bg-white rounded-full w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4 shadow-2xl overflow-hidden">
             <img
-              src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=Minimalist%20premium%20academy%20shield%20logo%2C%20bold%20stylized%20black%20lion%20head%20inside%20outlined%20classic%20shield%20crest%20badge%2C%20clean%20vector%20emblem%2C%20white%20and%20navy%20blue%20colors%2C%20no%20text%2C%20high%20quality%20logo%20icon%20for%20Asadbek%20Posts%20language%20learning%20center%20brand&image_size=square_hd"
+              src="/logo.svg"
               alt="Asadbek Posts logo"
               className="w-full h-full object-cover"
             />
