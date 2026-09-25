@@ -377,12 +377,12 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
           <div className="flex items-center justify-between h-14 sm:h-16">
             <Link to="/" className="flex items-center gap-2 min-w-0">
               <img
-                src="/logo.svg"
-                alt="Asadbek Posts logo"
+                src="/photo_2025-01-04_19-28-41.jpg"
+                alt="King School Learning Center logo"
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow object-cover bg-white flex-shrink-0"
               />
               <div className="hidden sm:block leading-tight">
-                <div className="text-white font-bold">ASADBEK POSTS</div>
+                <div className="text-white font-bold">KING SCHOOL LEARNING CENTER</div>
                 <div className="text-white/70 text-xs">Listening Practice</div>
               </div>
             </Link>
@@ -699,7 +699,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
                       ▶️ Oxirgi o'rn: <strong>{formatTime(initialProgress)}</strong>
                     </span>
                   </div>
-                  <div className="text-gray-400 text-xs">Asadbek Posts © 2026</div>
+                  <div className="text-gray-400 text-xs">King School Learning Center © 2026</div>
                 </div>
 
                 <div className="p-3 sm:p-6 md:p-10 bg-white">

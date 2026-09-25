@@ -282,7 +282,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
               <div>
                 <div className="font-bold">Telegram kanal</div>
-                <div className="text-xs text-white/85">Asadbek Posts rasmiy</div>
+                <div className="text-xs text-white/85">King School Learning Center rasmiy</div>
               </div>
             </div>
             <div className="text-sm bg-white/20 backdrop-blur px-3 py-2 rounded-lg text-center font-semibold">

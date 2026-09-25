@@ -1,0 +1,248 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1100" width="1200" height="1100">
+  <!-- ============= FULL LOGO - 4 Skill Blocks + Lion + Brand ============= -->
+  <!-- Layout geometry (matches user's image):
+       ┌─── WRITING 254x254 ───┐ ┌─── READING 254x254 ───┐
+       └───────────────────────┘ └───────────────────────┘
+                ┌─── LION ICON 360x360 ───┐
+       ┌─── LISTENING 254x254 ──┐ ┌─── SPEAKING 254x254 ─┐
+       └────────────────────────┘ └───────────────────────┘
+                 Asadbek Posts (KING SCHOOL)  Serif
+  -->
+  <defs>
+    <linearGradient id="writingBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="readingBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="listeningBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="speakingBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e5edf7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 4 SKILL BLOCKS -->
+  <!-- WRITING (top-left, rounded-2xl, drop-shadow) -->
+  <g transform="translate(240 130)">
+    <rect width="254" height="254" rx="28" ry="28" fill="url(#writingBg)"
+          filter="drop-shadow(0 18px 26px rgba(15,23,42,0.28))"/>
+    <!-- Clipboard/document icon (outline) -->
+    <g transform="translate(76 46)" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="28" y="22" width="114" height="136" rx="14" fill="#ffffff"/>
+      <rect x="28" y="22" width="114" height="136" rx="14" fill="none" stroke="#1e3a8a" stroke-width="5"/>
+      <rect x="10" y="54" width="36" height="18" rx="9" fill="#1e3a8a"/>
+      <rect x="22" y="58" width="12" height="10" rx="5" fill="#ffffff"/>
+      <!-- lines -->
+      <line x1="54" y1="86" x2="120" y2="86" stroke="#1e3a8a" stroke-width="8"/>
+      <line x1="54" y1="108" x2="120" y2="108" stroke="#1e3a8a" stroke-width="8"/>
+      <line x1="54" y1="130" x2="100" y2="130" stroke="#1e3a8a" stroke-width="8"/>
+    </g>
+    <text x="127" y="228"
+          font-family="'Arial Black','Impact',sans-serif"
+          font-size="52"
+          font-weight="900"
+          fill="#ffffff"
+          text-anchor="middle"
+          letter-spacing="6">
+      WRITING
+    </text>
+  </g>
+
+  <!-- READING (top-right) -->
+  <g transform="translate(706 130)">
+    <rect width="254" height="254" rx="28" ry="28" fill="url(#readingBg)"
+          filter="drop-shadow(0 18px 26px rgba(15,23,42,0.28))"/>
+    <!-- Pantheon/dome building (university icon) -->
+    <g transform="translate(58 52)" fill="#ffffff" stroke="#ffffff" stroke-width="3">
+      <g transform="translate(0 10)">
+        <!-- Dome -->
+        <path d="M 66 20
+                 C 18 22 18 86 6 100
+                 L 126 100
+                 C 114 86 114 22 66 20 Z" fill="none" stroke="#ffffff" stroke-width="8"/>
+        <path d="M 66 6 L 74 22 L 58 22 Z"/>
+        <!-- Pillars -->
+        <rect x="20" y="100" width="10" height="60"/>
+        <rect x="44" y="100" width="10" height="60"/>
+        <rect x="68" y="100" width="10" height="60"/>
+        <rect x="92" y="100" width="10" height="60"/>
+        <rect x="116" y="100" width="10" height="60"/>
+        <!-- Pediment -->
+        <rect x="10" y="92" width="126" height="12"/>
+        <!-- Step -->
+        <rect x="0" y="160" width="146" height="10"/>
+      </g>
+    </g>
+    <text x="127" y="228"
+          font-family="'Arial Black','Impact',sans-serif"
+          font-size="52"
+          font-weight="900"
+          fill="#ffffff"
+          text-anchor="middle"
+          letter-spacing="5">
+      READING
+    </text>
+  </g>
+
+  <!-- LISTENING (bottom-left) -->
+  <g transform="translate(240 472)">
+    <rect width="254" height="254" rx="28" ry="28" fill="url(#listeningBg)"
+          filter="drop-shadow(0 18px 26px rgba(15,23,42,0.28))"/>
+    <!-- Equalizer bars + play list lines -->
+    <g transform="translate(56 74)" fill="#ffffff" stroke="#ffffff">
+      <!-- lines -->
+      <rect x="0" y="0" width="104" height="12" rx="6"/>
+      <rect x="0" y="28" width="90" height="12" rx="6"/>
+      <rect x="0" y="56" width="76" height="12" rx="6"/>
+      <!-- vertical equalizer bar -->
+      <rect x="116" y="0" width="14" height="68" rx="7"/>
+    </g>
+    <text x="127" y="228"
+          font-family="'Arial Black','Impact',sans-serif"
+          font-size="52"
+          font-weight="900"
+          fill="#ffffff"
+          text-anchor="middle"
+          letter-spacing="6">
+      LISTENING
+    </text>
+  </g>
+
+  <!-- SPEAKING (bottom-right) -->
+  <g transform="translate(706 472)">
+    <rect width="254" height="254" rx="28" ry="28" fill="url(#speakingBg)"
+          stroke="#cbd5e1" stroke-width="2"
+          filter="drop-shadow(0 18px 26px rgba(15,23,42,0.18))"/>
+    <!-- Reading person + open book -->
+    <g transform="translate(60 60)">
+      <!-- Person above -->
+      <g fill="#3b82f6" stroke="#3b82f6" stroke-width="3">
+        <circle cx="68" cy="14" r="18"/>
+        <path d="M 30 60 C 30 32 54 30 68 30 C 82 30 106 32 106 60 Z"/>
+      </g>
+      <!-- Open book -->
+      <g transform="translate(4 72)" fill="#38bdf8" stroke="#1d4ed8" stroke-width="4">
+        <path d="M 0 40 L 0 6 L 62 0 L 68 14 L 74 0 L 136 6 L 136 40 L 68 34 Z"/>
+        <line x1="68" y1="14" x2="68" y2="34" stroke="#1d4ed8" stroke-width="3"/>
+      </g>
+    </g>
+    <text x="127" y="228"
+          font-family="'Arial Black','Impact',sans-serif"
+          font-size="52"
+          font-weight="900"
+          fill="#0f172a"
+          text-anchor="middle"
+          letter-spacing="5">
+      SPEAKING
+    </text>
+  </g>
+
+  <!-- ========= CENTER LION ICON (white rounded square overlapping) ========= -->
+  <g transform="translate(600 372)">
+    <rect x="-188" y="-188" width="376" height="376" rx="96" ry="96" fill="#ffffff"
+          filter="drop-shadow(0 20px 42px rgba(15,23,42,0.35))"/>
+    <rect x="-188" y="-188" width="376" height="376" rx="96" ry="96" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+
+    <!-- Lion line art (same geometry as logo.svg, scaled to fit 340) -->
+    <g transform="translate(0 8) scale(0.86)" fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+      <g stroke-width="16">
+        <path d="M 0 -188 C -116 -188 -198 -98 -198 28"/>
+        <path d="M 0 -188 C 116 -188 198 -98 198 28"/>
+        <path d="M -198 28 C -198 108 -148 164 -88 174 C -108 140 -120 100 -120 58"/>
+        <path d="M 198 28 C 198 108 148 164 88 174 C 108 140 120 100 120 58"/>
+        <path d="M -144 -48 C -156 -100 -96 -156 -30 -158 C -66 -132 -90 -100 -96 -60 C -114 -56 -132 -52 -144 -48 Z"/>
+        <path d="M 144 -48 C 156 -100 96 -156 30 -158 C 66 -132 90 -100 96 -60 C 114 -56 132 -52 144 -48 Z"/>
+        <path d="M -70 -170 C -40 -212 40 -212 70 -170 C 60 -204 20 -224 0 -220 C -20 -224 -60 -204 -70 -170 Z"/>
+        <path d="M -30 -216 C 0 -240 16 -234 26 -222"/>
+        <path d="M 0 -128 C -84 -128 -136 -72 -136 8 C -136 82 -94 146 -40 156 C -22 172 -6 182 0 196 C 6 182 22 172 40 156 C 94 146 136 82 136 8 C 136 -72 84 -128 0 -128 Z"/>
+      </g>
+      <g stroke-width="14">
+        <path d="M -104 -108 L -76 -152 L -46 -112 L -64 -98 L -84 -100 Z"/>
+        <path d="M 104 -108 L 76 -152 L 46 -112 L 64 -98 L 84 -100 Z"/>
+        <path d="M -90 -116 L -78 -140 L -62 -116" stroke-width="7"/>
+        <path d="M 90 -116 L 78 -140 L 62 -116" stroke-width="7"/>
+      </g>
+      <g stroke-width="12">
+        <path d="M -124 82 C -132 120 -122 158 -94 188"/>
+        <path d="M 124 82 C 132 120 122 158 94 188"/>
+        <path d="M -94 188 C -84 218 -46 238 -16 240 C -56 224 -86 204 -94 188 Z"/>
+        <path d="M 94 188 C 84 218 46 238 16 240 C 56 224 86 204 94 188 Z"/>
+      </g>
+      <g stroke-width="7">
+        <path d="M -112 -12 C -108 -52 -82 -92 -40 -108"/>
+        <path d="M 112 -12 C 108 -52 82 -92 40 -108"/>
+        <path d="M -116 24 C -104 6 -88 -8 -68 -14"/>
+        <path d="M 116 24 C 104 6 88 -8 68 -14"/>
+        <path d="M -108 68 C -88 52 -62 44 -38 46"/>
+        <path d="M 108 68 C 88 52 62 44 38 46"/>
+      </g>
+      <g stroke-width="11">
+        <path d="M -78 -36 C -62 -56 -22 -54 -18 -34 C -42 -40 -62 -30 -78 -36 Z"/>
+        <path d="M 78 -36 C 62 -56 22 -54 18 -34 C 42 -40 62 -30 78 -36 Z"/>
+      </g>
+      <g fill="#000000">
+        <circle cx="-44" cy="-42" r="6.5"/>
+        <circle cx="44" cy="-42" r="6.5"/>
+      </g>
+      <g stroke-width="13">
+        <path d="M -100 -82 C -74 -108 -36 -98 -26 -80 L -36 -64 C -64 -80 -88 -72 -100 -82 Z"/>
+        <path d="M 100 -82 C 74 -108 36 -98 26 -80 L 36 -64 C 64 -80 88 -72 100 -82 Z"/>
+      </g>
+      <g stroke-width="11">
+        <path d="M -60 18 C -64 -18 -30 -46 0 -46 C 30 -46 64 -18 60 18 C 60 54 30 82 0 82 C -30 82 -60 54 -60 18 Z"/>
+        <path d="M -24 6 L 24 6 L 0 34 Z"/>
+        <path d="M -24 6 C -34 -10 -16 -26 -4 -16 C -8 -6 -14 0 -24 6 Z"/>
+        <path d="M 24 6 C 34 -10 16 -26 4 -16 C 8 -6 14 0 24 6 Z"/>
+        <path d="M 0 58 Q -22 78 -44 72"/>
+        <path d="M 0 58 Q 22 78 44 72"/>
+        <path d="M 0 34 L 0 58"/>
+      </g>
+      <g fill="#ffffff" stroke="#000000" stroke-width="6" stroke-linejoin="round">
+        <path d="M -26 70 L -22 100 L -12 86 Z"/>
+        <path d="M 26 70 L 22 100 L 12 86 Z"/>
+      </g>
+      <g stroke-width="4.5">
+        <path d="M -58 20 L -112 4"/>
+        <path d="M -58 40 L -116 40"/>
+        <path d="M -58 58 L -112 76"/>
+        <path d="M 58 20 L 112 4"/>
+        <path d="M 58 40 L 116 40"/>
+        <path d="M 58 58 L 112 76"/>
+      </g>
+      <g fill="#000000">
+        <circle cx="-60" cy="18" r="3"/>
+        <circle cx="-62" cy="38" r="3"/>
+        <circle cx="-60" cy="58" r="3"/>
+        <circle cx="60" cy="18" r="3"/>
+        <circle cx="62" cy="38" r="3"/>
+        <circle cx="60" cy="58" r="3"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========= BRAND NAME (SERIF, NAVY BLUE) ========= -->
+  <text x="600" y="940"
+        font-family="'Georgia','Times New Roman',serif"
+        font-size="148"
+        font-weight="700"
+        fill="#0f172a"
+        text-anchor="middle"
+        letter-spacing="4">
+    Asadbek Posts
+  </text>
+  <text x="600" y="1020"
+        font-family="'Georgia','Times New Roman',serif"
+        font-size="72"
+        font-weight="400"
+        fill="#0f172a"
+        text-anchor="middle"
+        letter-spacing="10">
+    (KING SCHOOL)
+  </text>
+</svg>

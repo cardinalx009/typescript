@@ -155,13 +155,13 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <img
-                  src="/logo.svg"
-                  alt="Asadbek Posts logo"
+                  src="/photo_2025-01-04_19-28-41.jpg"
+                  alt="King School Learning Center logo"
                   className="w-14 h-14 rounded-xl object-cover bg-white shadow-lg"
                 />
                 <div>
-                  <div className="text-xl font-bold">ASADBEK POSTS</div>
-                  <div className="text-sm opacity-95">Learning Center</div>
+                  <div className="text-xl font-bold">KING SCHOOL</div>
+                  <div className="text-sm opacity-95">LEARNING CENTER</div>
                 </div>
               </div>
               <a

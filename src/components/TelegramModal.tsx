@@ -12,7 +12,7 @@ export default function TelegramModal({ open, onClose, onJoined }: TelegramModal
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-gradient-to-r from-blue-600 to-sky-500 p-6 text-white text-center">
           <div className="text-6xl mb-3">✈️</div>
-          <h2 className="text-2xl font-bold">Asadbek Posts Telegram</h2>
+          <h2 className="text-2xl font-bold">King School Learning Center Telegram</h2>
           <p className="text-sm opacity-95 mt-1">Rasmiy kanalimizga azo bo'ling!</p>
         </div>
 
@@ -54,7 +54,7 @@ export default function TelegramModal({ open, onClose, onJoined }: TelegramModal
         </div>
 
         <div className="bg-blue-50 px-6 py-3 text-center text-xs text-blue-700 border-t border-blue-100">
-          📚 Asadbek Posts Learning Center
+          📚 King School Learning Center
         </div>
       </div>
     </div>

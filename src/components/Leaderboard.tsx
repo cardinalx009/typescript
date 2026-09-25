@@ -37,7 +37,7 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
       <div className="space-y-6">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-            <span>🏆</span> Leaderboard — Asadbek Posts
+            <span>🏆</span> Leaderboard — King School Learning Center
           </h2>
           <p className="text-gray-500 text-sm">
             Yozilgan so'zlar soniga ko'ra barcha o'quvchilar reytingi
@@ -123,7 +123,7 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 px-4 py-2 rounded-lg font-medium transition-all"
             >
-              ✈️ Asadbek Posts Telegram
+              ✈️ King School Learning Center Telegram
             </a>
           </div>
 

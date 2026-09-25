@@ -24,13 +24,13 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
               <img
-                src="/logo.svg"
-                alt="Asadbek Posts logo"
+                src="/photo_2025-01-04_19-28-41.jpg"
+                alt="King School Learning Center logo"
                 className="w-10 h-10 rounded-full shadow-md object-cover bg-white"
               />
               <div className="hidden sm:block leading-tight">
                 <div className="text-white font-bold text-lg">
-                  ASADBEK POSTS
+                  KING SCHOOL LEARNING CENTER
                 </div>
                 <div className="text-white/70 text-xs">
                   English Listening

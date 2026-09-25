@@ -85,13 +85,13 @@ export default function Login({ onAuth }: LoginProps) {
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center justify-center bg-white rounded-full w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4 shadow-2xl overflow-hidden">
             <img
-              src="/logo.svg"
-              alt="Asadbek Posts logo"
+              src="/photo_2025-01-04_19-28-41.jpg"
+              alt="King School Learning Center logo"
               className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
-            ASADBEK POSTS
+            KING SCHOOL LEARNING CENTER
           </h1>
           <h2 className="text-lg sm:text-xl font-semibold text-white/90 mb-1 sm:mb-2">
             English Listening Practice
@@ -252,7 +252,7 @@ export default function Login({ onAuth }: LoginProps) {
               <span>✈️</span> Telegram kanalimiz
             </a>
             <div className="text-xs text-gray-400">
-              Asadbek Posts © 2026
+              King School Learning Center © 2026
             </div>
           </div>
         </div>
