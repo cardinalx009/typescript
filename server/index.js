@@ -23,11 +23,16 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-mongoose.connect(process.env.MONGODB_URI, {
-  serverSelectionTimeoutMS: 5000,
-})
-  .then(() => console.log('✅ MongoDB connected: King School Learning Center DB'))
-  .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.warn('⚠️ MONGODB_URI not configured — running without DB. Frontend will auto-fallback to localStorage. Set MONGODB_URI in Railway Variables to enable global leaderboard & shared accounts.');
+} else {
+  mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 5000,
+  })
+    .then(() => console.log('✅ MongoDB connected: King School Learning Center DB'))
+    .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+}
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
