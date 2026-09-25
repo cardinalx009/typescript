@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -10,6 +10,8 @@ import { User, AudioRecord, PendingAudio, TelegramModalSeen } from './models.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 30 * 1024 * 1024 } });
@@ -24,8 +26,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 mongoose.connect(process.env.MONGODB_URI, {
   serverSelectionTimeoutMS: 5000,
 })
-  .then(() => console.log('✅ MongoDB connected: Asadbek Posts DB'))
+  .then(() => console.log('✅ MongoDB connected: King School Learning Center DB'))
   .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 const recalcUserTotalWords = async (userId) => {
   try {
@@ -50,8 +54,20 @@ const simpleHashMatch = (p, h) => {
   return false;
 };
 
+const userAuthResponse = (user) => ({
+  id: user._id.toString(),
+  firstName: user.firstName,
+  lastName: user.lastName,
+  email: user.email,
+  totalWords: user.totalWords,
+  joinedAt: user.joinedAt.toISOString(),
+  passwordHash: user.passwordHash || undefined,
+  googleId: user.googleId || undefined,
+  avatar: user.avatar || undefined,
+});
+
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'Asadbek Posts Listening API', uptime: process.uptime() });
+  res.json({ ok: true, service: 'King School Learning Center Listening API', uptime: process.uptime() });
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -63,8 +79,11 @@ app.post('/api/auth/register', async (req, res) => {
     if (password.length < 4) {
       return res.status(400).json({ ok: false, error: 'Parol kamida 4 ta belgidan iborat bo\'lishi kerak' });
     }
-    const exists = await User.findOne({ email: email.toLowerCase() }).lean();
-    if (exists) {
+    const existing = await User.findOne({ email: email.toLowerCase() }).lean();
+    if (existing) {
+      if (existing.googleId) {
+        return res.status(409).json({ ok: false, error: 'Bu email Google orqali ro\'yxatdan o\'tgan. Iltimos Google bilan kiring.' });
+      }
       return res.status(409).json({ ok: false, error: 'Bu email bilan allaqachon hisob mavjud. Iltimos login qiling.' });
     }
     const salt = bcrypt.genSaltSync(10);
@@ -76,15 +95,8 @@ app.post('/api/auth/register', async (req, res) => {
     });
     res.json({
       ok: true,
-      user: {
-        id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        totalWords: user.totalWords,
-        joinedAt: user.joinedAt.toISOString(),
-        passwordHash: user.passwordHash,
-      },
+      user: userAuthResponse(user),
+      isNew: true,
     });
   } catch (e) {
     console.error(e);
@@ -102,24 +114,114 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       return res.status(404).json({ ok: false, error: 'Bu email bilan hisob topilmadi. Avval ro\'yxatdan o\'ting.' });
     }
-    if (!simpleHashMatch(password, user.passwordHash)) {
+    if (user.googleId && !user.passwordHash) {
+      return res.status(401).json({ ok: false, error: 'Bu hisob Google orqali ochilgan. Iltimos Google bilan kiring.' });
+    }
+    if (!user.passwordHash || !simpleHashMatch(password, user.passwordHash)) {
       return res.status(401).json({ ok: false, error: 'Parol noto\'g\'ri. Iltimos qayta urinib ko\'ring.' });
     }
     res.json({
       ok: true,
-      user: {
-        id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        totalWords: user.totalWords,
-        joinedAt: user.joinedAt.toISOString(),
-        passwordHash: user.passwordHash,
-      },
+      user: userAuthResponse(user),
     });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ ok: false, error: 'Google token topilmadi' });
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const gRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    if (!gRes.ok) {
+      return res.status(401).json({ ok: false, error: 'Google token noto\'g\'ri' });
+    }
+    const payload = await gRes.json();
+    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
+      return res.status(401).json({ ok: false, error: 'Google token client id mos emas' });
+    }
+    if (payload.email_verified !== 'true' && payload.email_verified !== true) {
+      return res.status(401).json({ ok: false, error: 'Google email tasdiqlanmagan' });
+    }
+    const email = String(payload.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(401).json({ ok: false, error: 'Google email topilmadi' });
+    }
+    const googleId = String(payload.sub || '');
+    const fullName = String(payload.name || '').trim();
+    const picture = String(payload.picture || '').trim();
+    let firstName = String(payload.given_name || '').trim();
+    let lastName = String(payload.family_name || '').trim();
+    if (!firstName && fullName) {
+      const parts = fullName.split(/\s+/);
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+    if (!firstName) firstName = email.split('@')[0] || 'User';
+    if (!lastName) lastName = '';
+
+    let user = await User.findOne({ $or: [{ googleId }, { email }] }).lean();
+    let isNew = false;
+    if (user) {
+      const patch = {};
+      if (googleId && !user.googleId) patch.googleId = googleId;
+      if (picture && !user.avatar) patch.avatar = picture;
+      if (!user.firstName) patch.firstName = firstName;
+      if (!user.lastName) patch.lastName = lastName;
+      if (Object.keys(patch).length) {
+        await User.updateOne({ _id: user._id }, patch);
+        user = await User.findById(user._id).lean();
+      }
+    } else {
+      user = await User.create({
+        firstName,
+        lastName,
+        email,
+        googleId,
+        avatar: picture || undefined,
+      });
+      isNew = true;
+    }
+    res.json({ ok: true, user: userAuthResponse(user), isNew });
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      return res.status(504).json({ ok: false, error: 'Google serveriga ulanishda timeout' });
+    }
+    console.error('Google auth error:', e);
+    res.status(500).json({ ok: false, error: 'Google orqali kirishda xatolik' });
+  }
+});
+
+app.patch('/api/users/:userId', async (req, res) => {
+  try {
+    const { firstName, lastName } = req.body;
+    const patch = {};
+    if (firstName !== undefined) {
+      const v = String(firstName).trim();
+      if (v) patch.firstName = v;
+    }
+    if (lastName !== undefined) {
+      patch.lastName = String(lastName).trim();
+    }
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({ ok: false, error: 'Yangilanadigan maydon yo\'q' });
+    }
+    const user = await User.findByIdAndUpdate(req.params.userId, patch, { new: true }).lean();
+    if (!user) return res.status(404).json({ ok: false });
+    res.json({ ok: true, user: userAuthResponse(user) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Yangilashda xato' });
   }
 });
 
@@ -325,5 +427,5 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.listen(PORT, () => {
-  console.log(`🚀 Asadbek Posts API running on http://localhost:${PORT}`);
+  console.log(`🚀 King School Learning Center API running on http://localhost:${PORT}`);
 });

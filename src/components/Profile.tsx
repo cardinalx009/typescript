@@ -1,5 +1,6 @@
-import { User } from '../types';
-import { getUserRecords, saveUsers, getUsers, setCurrentUser } from '../storage';
+import { User, AudioRecord } from '../types';
+import { useState, useEffect } from 'react';
+import { getUserRecords, getUsers, saveUsers, setCurrentUser, updateCurrentUser } from '../storage';
 import Layout from './Layout';
 
 interface ProfileProps {
@@ -9,7 +10,21 @@ interface ProfileProps {
 }
 
 export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
-  const records = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const recs = await getUserRecords(user.id);
+      if (cancelled) return;
+      setRecords(recs);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
   const totalAudios = records.length;
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
 
@@ -31,16 +46,21 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
     onLogout();
   };
 
-  const handleRefreshStats = () => {
+  const handleRefreshStats = async () => {
+    const recs = await getUserRecords(user.id);
+    const words = recs.reduce((s, r) => s + r.wordCount, 0);
     const users = getUsers();
     const idx = users.findIndex(u => u.id === user.id);
     if (idx !== -1) {
-      const recs = getUserRecords(user.id);
-      users[idx].totalWords = recs.reduce((s, r) => s + r.wordCount, 0);
+      users[idx].totalWords = words;
       saveUsers(users);
       setCurrentUser(users[idx]);
       onUpdate(users[idx]);
+      return;
     }
+    updateCurrentUser({ totalWords: words });
+    const cur = { ...user, totalWords: words };
+    onUpdate(cur);
   };
 
   return (
@@ -48,14 +68,28 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-            <div className="w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center text-white text-4xl font-bold mb-4 shadow-lg">
-              {user.firstName[0]}
-              {user.lastName[0]}
-            </div>
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={`${user.firstName} ${user.lastName}`}
+                referrerPolicy="no-referrer"
+                className="w-28 h-28 mx-auto rounded-full object-cover mb-4 shadow-lg ring-4 ring-blue-100"
+              />
+            ) : (
+              <div className="w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center text-white text-4xl font-bold mb-4 shadow-lg">
+                {user.firstName[0]}
+                {user.lastName[0] || ''}
+              </div>
+            )}
             <h2 className="text-2xl font-bold text-gray-800">
               {user.firstName} {user.lastName}
             </h2>
             <p className="text-gray-500 mt-1">{user.email}</p>
+            {user.googleId && (
+              <p className="text-xs text-sky-600 mt-2 font-medium">
+                🔐 Google orqali kirish
+              </p>
+            )}
             <p className="text-xs text-gray-400 mt-2">
               Qo'shilgan: {formatDate(user.joinedAt)}
             </p>
@@ -99,16 +133,16 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-600 to-sky-500 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">Jami so'zlar</div>
-                <div className="text-3xl font-bold mt-1">{user.totalWords}</div>
+                <div className="text-3xl font-bold mt-1">{loading ? '...' : user.totalWords}</div>
               </div>
               <div className="bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">Jami audiolar</div>
-                <div className="text-3xl font-bold mt-1">{totalAudios}</div>
+                <div className="text-3xl font-bold mt-1">{loading ? '...' : totalAudios}</div>
               </div>
               <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">O'rtacha / audio</div>
                 <div className="text-3xl font-bold mt-1">
-                  {totalAudios > 0 ? Math.round(totalWords / totalAudios) : 0}
+                  {loading ? '...' : (totalAudios > 0 ? Math.round(totalWords / totalAudios) : 0)}
                 </div>
               </div>
             </div>

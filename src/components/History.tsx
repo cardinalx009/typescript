@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User } from '../types';
+import { User, AudioRecord } from '../types';
 import { getUserRecords, buildEditTempId } from '../storage';
 import Layout from './Layout';
 
@@ -10,8 +10,21 @@ interface HistoryProps {
 }
 
 export default function History({ user, onLogout }: HistoryProps) {
-  const records = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const recs = await getUserRecords(user.id);
+      if (cancelled) return;
+      setRecords(recs);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
 
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -63,10 +76,11 @@ export default function History({ user, onLogout }: HistoryProps) {
           </div>
           <p className="text-gray-500 text-sm">
             Bu yerda so'nggi 24 soat ichida saqlangan amaliyotlaringiz ko'rsatiladi (audiolar vaqtinchalik 1 kun saqlanadi)
+            {loading && <span className="ml-2 text-blue-500">Yuklanmoqda...</span>}
           </p>
         </div>
 
-        {records.length === 0 ? (
+        {records.length === 0 && !loading ? (
           <div className="bg-white rounded-2xl shadow-xl p-16 text-center">
             <div className="text-7xl mb-4">📭</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">
@@ -75,12 +89,12 @@ export default function History({ user, onLogout }: HistoryProps) {
             <p className="text-gray-500 mb-6">
               Asosiy saxifaga o'ting va birinchi audioni yuklab, mashq qilishni boshlang!
             </p>
-            <a
-              href="/"
+            <Link
+              to="/"
               className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-sky-600 transition-all shadow-lg"
             >
               Asosiy saxifaga o'tish
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">

@@ -1,6 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
-import { registerUser, loginUser, getUsers } from '../storage';
+import { registerUser, loginUser, authWithGoogle, getUsers } from '../storage';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (parent: HTMLElement, config: any) => void;
+          prompt: (callback?: any) => void;
+        };
+      };
+    };
+  }
+}
 
 interface LoginProps {
   onAuth: (user: User, isNew: boolean) => void;
@@ -20,10 +34,78 @@ export default function Login({ onAuth }: LoginProps) {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const resetErr = () => setError('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+
+  useEffect(() => {
+    if (!googleClientId) return;
+    let cancelled = false;
+    const init = () => {
+      if (cancelled || !window.google?.accounts?.id) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response: any) => {
+            if (cancelled) return;
+            const cred = response?.credential;
+            if (!cred) return;
+            setGoogleLoading(true);
+            resetErr();
+            try {
+              const res = await authWithGoogle(cred);
+              if (res.ok && res.user) {
+                onAuth(res.user, !!res.isNew);
+                return;
+              }
+              setError(res.error || 'Google orqali kirishda xatolik');
+            } catch (e: any) {
+              setError('Google orqali kirishda xatolik');
+            } finally {
+              setGoogleLoading(false);
+            }
+          },
+          auto_select: false,
+          ux_mode: 'popup',
+        });
+        if (googleBtnRef.current) {
+          window.google.accounts.id.renderButton(googleBtnRef.current, {
+            theme: 'outline',
+            size: 'large',
+            shape: 'pill',
+            width: googleBtnRef.current.clientWidth || 320,
+            text: 'continue_with',
+            logo_alignment: 'left',
+          });
+        }
+      } catch (e) {
+        // ignore GIS errors silently
+      }
+    };
+    if (window.google?.accounts?.id) {
+      init();
+    } else {
+      const t = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(t);
+          init();
+        }
+      }, 150);
+      const to = setTimeout(() => clearInterval(t), 10000);
+      return () => {
+        cancelled = true;
+        clearInterval(t);
+        clearTimeout(to);
+      };
+    }
+    return () => { cancelled = true; };
+  }, [googleClientId, onAuth]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErr();
 
@@ -34,49 +116,58 @@ export default function Login({ onAuth }: LoginProps) {
     if (!emailRegex.test(email)) return setError('To\'g\'ri email kiriting');
 
     setLoading(true);
-    setTimeout(() => {
-      try {
-        if (tab === 'register') {
-          if (!firstName.trim() || !lastName.trim()) {
-            setLoading(false);
-            return setError('Ism va familyani kiriting');
-          }
-          if (password.length < 4) {
-            setLoading(false);
-            return setError('Parol kamida 4 ta belgi bo\'lsin');
-          }
-          if (password !== confirmPassword) {
-            setLoading(false);
-            return setError('Parollar mos emas');
-          }
-          const existedEmail = getUsers().some(
-            (u) => u.email.toLowerCase() === email.toLowerCase()
-          );
-          if (existedEmail) {
-            setLoading(false);
-            setTab('login');
-            return setError('Bu email mavjud. Pastdan Login qismiga o\'tdingiz, parol bilan kiring.');
-          }
-          const res = registerUser(firstName, lastName, email, password);
-          if (!res.ok || !res.user) {
-            setLoading(false);
-            return setError(res.error || 'Xatolik');
-          }
-          onAuth(res.user, true);
-        } else {
-          const res = loginUser(email, password);
-          if (!res.ok || !res.user) {
-            setLoading(false);
-            return setError(res.error || 'Xatolik');
-          }
-          onAuth(res.user, false);
+    try {
+      if (tab === 'register') {
+        if (!firstName.trim() || !lastName.trim()) {
+          setLoading(false);
+          return setError('Ism va familyani kiriting');
         }
-      } catch (err) {
-        setError('Xatolik yuz berdi');
-      } finally {
-        setLoading(false);
+        if (password.length < 4) {
+          setLoading(false);
+          return setError('Parol kamida 4 ta belgi bo\'lsin');
+        }
+        if (password !== confirmPassword) {
+          setLoading(false);
+          return setError('Parollar mos emas');
+        }
+        const res = await registerUser(firstName, lastName, email, password);
+        if (!res.ok || !res.user) {
+          setLoading(false);
+          if (res.error && res.error.includes('Google')) {
+            setTab('login');
+          }
+          if (res.error) return setError(res.error);
+          return setError('Xatolik');
+        }
+        onAuth(res.user, true);
+        return;
       }
-    }, 400);
+      const res = await loginUser(email, password);
+      if (!res.ok || !res.user) {
+        setLoading(false);
+        return setError(res.error || 'Xatolik');
+      }
+      onAuth(res.user, false);
+    } catch (err) {
+      setLoading(false);
+      setError('Xatolik yuz berdi');
+    }
+  };
+
+  const handleGooglePrompt = async () => {
+    if (!googleClientId) {
+      setError('Google Client ID sozlanmagan. Admin bilan bog\'laning.');
+      return;
+    }
+    if (window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt();
+      } catch (e: any) {
+        setError('Google orqali kirish hozircha ishlamayapti');
+      }
+    } else {
+      setError('Google yuklanmoqda, ozgina kuting');
+    }
   };
 
   return (
@@ -102,6 +193,37 @@ export default function Login({ onAuth }: LoginProps) {
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-5 sm:p-8">
+          {googleClientId && (
+            <>
+              <div className="mb-5 flex justify-center">
+                <div
+                  ref={googleBtnRef}
+                  className={googleLoading ? 'opacity-60 pointer-events-none' : ''}
+                  style={{ width: '100%', maxWidth: 360 }}
+                />
+              </div>
+              {googleLoading && (
+                <div className="text-center text-sm text-blue-600 font-medium mb-4">
+                  Google orqali kirish...
+                </div>
+              )}
+              {!googleLoading && (
+                <button
+                  type="button"
+                  onClick={handleGooglePrompt}
+                  className="mb-5 w-full py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium text-sm hover:bg-gray-50 transition-all hidden"
+                >
+                  Google orqali kirish
+                </button>
+              )}
+              <div className="flex items-center gap-3 mb-5 text-gray-400">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs uppercase tracking-wider">yoki</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+            </>
+          )}
+
           <div className="flex bg-gray-100 rounded-xl p-1 mb-5 sm:mb-6">
             <button
               type="button"

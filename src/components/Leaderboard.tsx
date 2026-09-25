@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { User } from '../types';
 import { getLeaderboard, getUserRecords } from '../storage';
 import Layout from './Layout';
@@ -9,9 +9,27 @@ interface LeaderboardProps {
 }
 
 export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
-  const users = useMemo(() => getLeaderboard(), [user]);
-  const myRecords = getUserRecords(user.id);
-  const myRank = users.findIndex((u) => u.id === user.id) + 1;
+  const [users, setUsers] = useState<User[]>([]);
+  const [myRecords, setMyRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [list, recs] = await Promise.all([
+        getLeaderboard(),
+        getUserRecords(user.id),
+      ]);
+      if (cancelled) return;
+      setUsers(list);
+      setMyRecords(recs);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
+  const myRank = useMemo(() => users.findIndex((u) => u.id === user.id) + 1, [users, user.id]);
   const myAudioCount = myRecords.length;
 
   const getMedal = (rank: number) => {
@@ -49,7 +67,7 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
             <div>
               <div className="text-sm opacity-90 mb-1">Sizning natijangiz</div>
               <div className="flex items-center gap-3">
-                <div className="text-4xl font-bold">#{myRank}</div>
+                <div className="text-4xl font-bold">#{loading ? '...' : myRank || (users.length ? users.length + 1 : 1)}</div>
                 <div>
                   <div className="text-lg font-semibold">
                     {user.firstName} {user.lastName}
@@ -94,8 +112,8 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
                   >
                     <div className="text-5xl">{getMedal(rank)}</div>
                     <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur flex items-center justify-center font-bold text-2xl">
-                      {u.firstName[0]}
-                      {u.lastName[0]}
+                      {(u.firstName || 'U')[0]}
+                      {(u.lastName || ' ')[0]}
                     </div>
                     <div className="text-center w-full">
                       <div className="font-bold truncate">
@@ -116,6 +134,7 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
           <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <span>📋</span> Barcha o'quvchilar ({users.length})
+              {loading && <span className="text-sm font-normal text-gray-400 ml-2">Yuklanmoqda...</span>}
             </h3>
             <a
               href="https://t.me/asadbekposts"
@@ -127,7 +146,7 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
             </a>
           </div>
 
-          {users.length === 0 ? (
+          {users.length === 0 && !loading ? (
             <div className="p-12 text-center">
               <div className="text-5xl mb-3">👥</div>
               <div className="text-gray-500">Hali o'quvchilar yo'q</div>
@@ -148,8 +167,8 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
                         {getMedal(rank)}
                       </div>
                       <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow">
-                        {u.firstName[0]}
-                        {u.lastName[0]}
+                        {(u.firstName || 'U')[0]}
+                        {(u.lastName || ' ')[0]}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-gray-800 truncate flex items-center gap-2">
@@ -187,8 +206,8 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
                         {getMedal(rank)}
                       </div>
                       <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-sky-400 flex items-center justify-center text-white font-bold flex-shrink-0 shadow">
-                        {u.firstName[0]}
-                        {u.lastName[0]}
+                        {(u.firstName || 'U')[0]}
+                        {(u.lastName || ' ')[0]}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-gray-800 truncate flex items-center gap-2">
