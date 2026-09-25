@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "start:full": "concurrently -n FRONT,BACK -c blue,green \"npm:dev\" \"npm:server\"",
-    "start": "node server/index.js"
+    "start": "node server/start.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

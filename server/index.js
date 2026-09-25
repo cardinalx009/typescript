@@ -4,6 +4,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { User, AudioRecord, PendingAudio, TelegramModalSeen } from './models.js';
@@ -423,11 +424,28 @@ app.post('/api/telegram/seen/:userId', async (req, res) => {
   }
 });
 
-if (process.env.NODE_ENV === 'production') {
-  const dist = path.resolve(__dirname, '..', 'dist');
+const dist = path.resolve(__dirname, '..', 'dist');
+const distIndex = path.join(dist, 'index.html');
+if (fs.existsSync(distIndex)) {
+  console.log(`📦 Serving static frontend from: ${dist}`);
   app.use(express.static(dist));
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(dist, 'index.html'));
+    res.sendFile(distIndex);
+  });
+} else {
+  console.warn(`⚠️ dist/index.html not found at ${distIndex} — run "npm run build" to generate frontend. Static site will NOT be available.`);
+  app.get('/', (_req, res) => {
+    res.type('html').send(`
+      <!doctype html>
+      <html lang="en"><head><meta charset="utf-8"><title>King School — Build required</title></head>
+      <body style="font-family:sans-serif;text-align:center;margin-top:80px;">
+        <h1 style="color:#1e3a8a;">👑 King School Learning Center</h1>
+        <h2 style="color:#64748b;">Frontend build topilmadi</h2>
+        <p style="max-width:520px;margin:16px auto;">Server ishlayapti, lekin <code>dist/</code> folderi yo'q. Railway Build Command sozlanmagan bo'lishi mumkin.<br><br>
+        <strong>Qo'llanma:</strong> Railway Settings → <em>Build Command</em> ga <code>npm run build</code> yozing va redeploy qiling.<br><br>
+        <a href="/api/health" style="color:#2563eb;">Healthcheck → /api/health</a></p>
+      </body></html>
+    `);
   });
 }
 
