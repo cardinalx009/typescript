@@ -14,33 +14,23 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [stats, setStats] = useState({ audios: 0, words: 0, avg: 0, rank: 0, totalUsers: 0 });
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setStatsLoading(true);
-      const [records, users] = await Promise.all([
-        getUserRecords(user.id),
-        getLeaderboard(),
-      ]);
-      if (cancelled) return;
-      const words = records.reduce((s, r) => s + r.wordCount, 0);
-      const rank = users.findIndex((u) => u.id === user.id) + 1;
-      setStats({
-        audios: records.length,
-        words: user.totalWords || words,
-        avg: records.length ? Math.round(words / records.length) : 0,
-        rank: rank || (users.length ? users.length + 1 : 1),
-        totalUsers: users.length,
-      });
-      setStatsLoading(false);
-    })();
-    return () => { cancelled = true; };
+    const records = getUserRecords(user.id);
+    const words = records.reduce((s, r) => s + r.wordCount, 0);
+    const users = getLeaderboard();
+    const rank = users.findIndex((u) => u.id === user.id) + 1;
+    setStats({
+      audios: records.length,
+      words: user.totalWords || words,
+      avg: records.length ? Math.round(words / records.length) : 0,
+      rank,
+      totalUsers: users.length,
+    });
   }, [user.id, user.totalWords]);
 
-  const handleFile = async (file: File) => {
+  const handleFile = (file: File) => {
     if (!file.type.startsWith('audio/')) {
       alert('Faqat audio fayl yuklang! (MP3, WAV, OGG, M4A va h.k.)');
       return;
@@ -51,13 +41,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       return;
     }
     setLoading(true);
-    try {
-      const pending = await savePendingAudio(file, user.id);
-      navigate(`/transcribe/${pending.tempId}`, { replace: true });
-    } catch (e) {
-      setLoading(false);
-      alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
-    }
+    setTimeout(() => {
+      try {
+        const pending = savePendingAudio(file);
+        navigate(`/transcribe/${pending.tempId}`, { replace: true });
+      } catch (e) {
+        setLoading(false);
+        alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
+      }
+    }, 250);
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -88,7 +80,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             </div>
             <div className="flex gap-3">
               <div className="bg-white/20 backdrop-blur px-4 py-2.5 rounded-xl text-center min-w-[88px]">
-                <div className="text-xs text-white/85">{statsLoading ? '...' : `#${stats.rank}/${stats.totalUsers}`}</div>
+                <div className="text-xs text-white/85">#{stats.rank}/{stats.totalUsers}</div>
                 <div className="text-lg font-bold">Reyting</div>
               </div>
               <Link

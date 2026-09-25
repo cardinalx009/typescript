@@ -1,18 +1,15 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { User, AudioRecord, PendingAudio, TelegramModalSeen } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 30 * 1024 * 1024 } });
@@ -24,18 +21,11 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  console.warn('⚠️ MONGODB_URI not configured — running without DB. Frontend will auto-fallback to localStorage. Set MONGODB_URI in Railway Variables to enable global leaderboard & shared accounts.');
-} else {
-  mongoose.connect(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000,
-  })
-    .then(() => console.log('✅ MongoDB connected: King School Learning Center DB'))
-    .catch((err) => console.error('❌ MongoDB connection error:', err.message));
-}
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+mongoose.connect(process.env.MONGODB_URI, {
+  serverSelectionTimeoutMS: 5000,
+})
+  .then(() => console.log('✅ MongoDB connected: Asadbek Posts DB'))
+  .catch((err) => console.error('❌ MongoDB connection error:', err.message));
 
 const recalcUserTotalWords = async (userId) => {
   try {
@@ -60,20 +50,8 @@ const simpleHashMatch = (p, h) => {
   return false;
 };
 
-const userAuthResponse = (user) => ({
-  id: user._id.toString(),
-  firstName: user.firstName,
-  lastName: user.lastName,
-  email: user.email,
-  totalWords: user.totalWords,
-  joinedAt: user.joinedAt.toISOString(),
-  passwordHash: user.passwordHash || undefined,
-  googleId: user.googleId || undefined,
-  avatar: user.avatar || undefined,
-});
-
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'King School Learning Center Listening API', uptime: process.uptime() });
+  res.json({ ok: true, service: 'Asadbek Posts Listening API', uptime: process.uptime() });
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -85,11 +63,8 @@ app.post('/api/auth/register', async (req, res) => {
     if (password.length < 4) {
       return res.status(400).json({ ok: false, error: 'Parol kamida 4 ta belgidan iborat bo\'lishi kerak' });
     }
-    const existing = await User.findOne({ email: email.toLowerCase() }).lean();
-    if (existing) {
-      if (existing.googleId) {
-        return res.status(409).json({ ok: false, error: 'Bu email Google orqali ro\'yxatdan o\'tgan. Iltimos Google bilan kiring.' });
-      }
+    const exists = await User.findOne({ email: email.toLowerCase() }).lean();
+    if (exists) {
       return res.status(409).json({ ok: false, error: 'Bu email bilan allaqachon hisob mavjud. Iltimos login qiling.' });
     }
     const salt = bcrypt.genSaltSync(10);
@@ -101,8 +76,15 @@ app.post('/api/auth/register', async (req, res) => {
     });
     res.json({
       ok: true,
-      user: userAuthResponse(user),
-      isNew: true,
+      user: {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        totalWords: user.totalWords,
+        joinedAt: user.joinedAt.toISOString(),
+        passwordHash: user.passwordHash,
+      },
     });
   } catch (e) {
     console.error(e);
@@ -120,114 +102,24 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       return res.status(404).json({ ok: false, error: 'Bu email bilan hisob topilmadi. Avval ro\'yxatdan o\'ting.' });
     }
-    if (user.googleId && !user.passwordHash) {
-      return res.status(401).json({ ok: false, error: 'Bu hisob Google orqali ochilgan. Iltimos Google bilan kiring.' });
-    }
-    if (!user.passwordHash || !simpleHashMatch(password, user.passwordHash)) {
+    if (!simpleHashMatch(password, user.passwordHash)) {
       return res.status(401).json({ ok: false, error: 'Parol noto\'g\'ri. Iltimos qayta urinib ko\'ring.' });
     }
     res.json({
       ok: true,
-      user: userAuthResponse(user),
+      user: {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        totalWords: user.totalWords,
+        joinedAt: user.joinedAt.toISOString(),
+        passwordHash: user.passwordHash,
+      },
     });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: 'Server xatosi' });
-  }
-});
-
-app.post('/api/auth/google', async (req, res) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) {
-      return res.status(400).json({ ok: false, error: 'Google token topilmadi' });
-    }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const gRes = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeout);
-    if (!gRes.ok) {
-      return res.status(401).json({ ok: false, error: 'Google token noto\'g\'ri' });
-    }
-    const payload = await gRes.json();
-    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
-      return res.status(401).json({ ok: false, error: 'Google token client id mos emas' });
-    }
-    if (payload.email_verified !== 'true' && payload.email_verified !== true) {
-      return res.status(401).json({ ok: false, error: 'Google email tasdiqlanmagan' });
-    }
-    const email = String(payload.email || '').toLowerCase().trim();
-    if (!email) {
-      return res.status(401).json({ ok: false, error: 'Google email topilmadi' });
-    }
-    const googleId = String(payload.sub || '');
-    const fullName = String(payload.name || '').trim();
-    const picture = String(payload.picture || '').trim();
-    let firstName = String(payload.given_name || '').trim();
-    let lastName = String(payload.family_name || '').trim();
-    if (!firstName && fullName) {
-      const parts = fullName.split(/\s+/);
-      firstName = parts[0] || '';
-      lastName = parts.slice(1).join(' ') || '';
-    }
-    if (!firstName) firstName = email.split('@')[0] || 'User';
-    if (!lastName) lastName = '';
-
-    let user = await User.findOne({ $or: [{ googleId }, { email }] }).lean();
-    let isNew = false;
-    if (user) {
-      const patch = {};
-      if (googleId && !user.googleId) patch.googleId = googleId;
-      if (picture && !user.avatar) patch.avatar = picture;
-      if (!user.firstName) patch.firstName = firstName;
-      if (!user.lastName) patch.lastName = lastName;
-      if (Object.keys(patch).length) {
-        await User.updateOne({ _id: user._id }, patch);
-        user = await User.findById(user._id).lean();
-      }
-    } else {
-      user = await User.create({
-        firstName,
-        lastName,
-        email,
-        googleId,
-        avatar: picture || undefined,
-      });
-      isNew = true;
-    }
-    res.json({ ok: true, user: userAuthResponse(user), isNew });
-  } catch (e) {
-    if (e && e.name === 'AbortError') {
-      return res.status(504).json({ ok: false, error: 'Google serveriga ulanishda timeout' });
-    }
-    console.error('Google auth error:', e);
-    res.status(500).json({ ok: false, error: 'Google orqali kirishda xatolik' });
-  }
-});
-
-app.patch('/api/users/:userId', async (req, res) => {
-  try {
-    const { firstName, lastName } = req.body;
-    const patch = {};
-    if (firstName !== undefined) {
-      const v = String(firstName).trim();
-      if (v) patch.firstName = v;
-    }
-    if (lastName !== undefined) {
-      patch.lastName = String(lastName).trim();
-    }
-    if (!Object.keys(patch).length) {
-      return res.status(400).json({ ok: false, error: 'Yangilanadigan maydon yo\'q' });
-    }
-    const user = await User.findByIdAndUpdate(req.params.userId, patch, { new: true }).lean();
-    if (!user) return res.status(404).json({ ok: false });
-    res.json({ ok: true, user: userAuthResponse(user) });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ ok: false, error: 'Yangilashda xato' });
   }
 });
 
@@ -424,31 +316,14 @@ app.post('/api/telegram/seen/:userId', async (req, res) => {
   }
 });
 
-const dist = path.resolve(__dirname, '..', 'dist');
-const distIndex = path.join(dist, 'index.html');
-if (fs.existsSync(distIndex)) {
-  console.log(`📦 Serving static frontend from: ${dist}`);
+if (process.env.NODE_ENV === 'production') {
+  const dist = path.resolve(__dirname, '..', 'dist');
   app.use(express.static(dist));
   app.get('*', (_req, res) => {
-    res.sendFile(distIndex);
-  });
-} else {
-  console.warn(`⚠️ dist/index.html not found at ${distIndex} — run "npm run build" to generate frontend. Static site will NOT be available.`);
-  app.get('/', (_req, res) => {
-    res.type('html').send(`
-      <!doctype html>
-      <html lang="en"><head><meta charset="utf-8"><title>King School — Build required</title></head>
-      <body style="font-family:sans-serif;text-align:center;margin-top:80px;">
-        <h1 style="color:#1e3a8a;">👑 King School Learning Center</h1>
-        <h2 style="color:#64748b;">Frontend build topilmadi</h2>
-        <p style="max-width:520px;margin:16px auto;">Server ishlayapti, lekin <code>dist/</code> folderi yo'q. Railway Build Command sozlanmagan bo'lishi mumkin.<br><br>
-        <strong>Qo'llanma:</strong> Railway Settings → <em>Build Command</em> ga <code>npm run build</code> yozing va redeploy qiling.<br><br>
-        <a href="/api/health" style="color:#2563eb;">Healthcheck → /api/health</a></p>
-      </body></html>
-    `);
+    res.sendFile(path.join(dist, 'index.html'));
   });
 }
 
 app.listen(PORT, () => {
-  console.log(`🚀 King School Learning Center API running on http://localhost:${PORT}`);
+  console.log(`🚀 Asadbek Posts API running on http://localhost:${PORT}`);
 });

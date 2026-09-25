@@ -3,9 +3,7 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
-  passwordHash?: string;
-  googleId?: string;
-  avatar?: string;
+  passwordHash: string;
   totalWords: number;
   joinedAt: string;
 }

@@ -4,9 +4,7 @@ const UserSchema = new mongoose.Schema({
   firstName: { type: String, required: true, trim: true },
   lastName: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true, lowercase: true, unique: true },
-  passwordHash: { type: String },
-  googleId: { type: String, unique: true, sparse: true },
-  avatar: { type: String },
+  passwordHash: { type: String, required: true },
   totalWords: { type: Number, default: 0 },
   joinedAt: { type: Date, default: Date.now },
 });
