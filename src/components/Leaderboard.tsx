@@ -19,12 +19,9 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
     if (force) setRefreshing(true);
     else setLoading(true);
     try {
-      const [localRecs, globalUsers] = await Promise.all([
-        getUserRecords(user.id),
-        getGlobalLeaderboard(force),
-      ]);
+      const globalUsers = await getGlobalLeaderboard(force);
       setUsers(globalUsers);
-      setMyRecords(localRecs);
+      setMyRecords(getUserRecords(user.id));
       const onlyLocal = globalUsers.length <= 1 || (globalUsers.length === 1 && globalUsers[0].id === user.id);
       setApiFailed(onlyLocal && force);
     } finally {

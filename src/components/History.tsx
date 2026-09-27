@@ -15,16 +15,9 @@ export default function History({ user, onLogout }: HistoryProps) {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const list = await getUserRecords(user.id);
-      if (!cancelled) {
-        setRecords(list);
-        setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    setLoading(true);
+    setRecords(getUserRecords(user.id));
+    setLoading(false);
   }, [user.id]);
 
   const formatDateTime = (iso: string) => {

@@ -217,6 +217,33 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   const transcriptRef = useRef(transcript);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (!audioNameRef.current.trim()) return;
+    e.preventDefault();
+    e.returnValue = '';
+    void (async () => {
+      try {
+        if (!recordIdRef.current) {
+          await addRecord(user.id, audioNameRef.current, transcriptRef.current, currentTimeRef.current);
+        } else {
+          await updateRecord(recordIdRef.current, {
+            transcript: transcriptRef.current,
+            audioName: audioNameRef.current,
+            progressSeconds: currentTimeRef.current,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  };
+
+  useEffect(() => {
+    if (stepOne) window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepOne, recordId, audioName, transcript]);
+
   const handleReUploadAudio = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith('audio/')) {
@@ -439,33 +466,6 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     if (initial.pending && tempId) clearPendingAudio(tempId);
     navigate('/history', { replace: true });
   };
-
-  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-    if (!audioNameRef.current.trim()) return;
-    e.preventDefault();
-    e.returnValue = '';
-    void (async () => {
-      try {
-        if (!recordIdRef.current) {
-          await addRecord(user.id, audioNameRef.current, transcriptRef.current, currentTimeRef.current);
-        } else {
-          await updateRecord(recordIdRef.current, {
-            transcript: transcriptRef.current,
-            audioName: audioNameRef.current,
-            progressSeconds: currentTimeRef.current,
-          });
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-  };
-
-  useEffect(() => {
-    if (stepOne) window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepOne, recordId, audioName, transcript]);
 
   return (
     <div className="min-h-screen flex flex-col">

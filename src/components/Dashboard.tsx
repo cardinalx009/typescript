@@ -21,11 +21,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const loadStats = useCallback(async (force = false) => {
     setStatsLoading(true);
     try {
-      const [recs, lb] = await Promise.all([
-        getUserRecords(user.id),
-        getGlobalLeaderboard(force),
-      ]);
-      setRecords(recs);
+      const lb = await getGlobalLeaderboard(force);
+      setRecords(getUserRecords(user.id));
       setLeaderboard(lb);
     } finally {
       setStatsLoading(false);
@@ -58,7 +55,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       alert(`Audio fayl hajmi ${maxMB} MB dan oshmasligi kerak.`);
       return;
     }
-    const pending = await savePendingAudio(file, user.id);
+    const pending = savePendingAudio(file);
     navigate(`/transcribe/${pending.tempId}`, { replace: true });
   };
 

@@ -14,15 +14,10 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRecords = async () => {
-    setLoading(true);
-    const list = await getUserRecords(user.id);
-    setRecords(list);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    void loadRecords();
+    setLoading(true);
+    setRecords(getUserRecords(user.id));
+    setLoading(false);
   }, [user.id]);
 
   const totalAudios = records.length;
@@ -49,7 +44,7 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
   const handleRefreshStats = async () => {
     setRefreshing(true);
     try {
-      const recs = await getUserRecords(user.id);
+      const recs = getUserRecords(user.id);
       const words = recs.reduce((s, r) => s + r.wordCount, 0);
       const users = getUsers();
       const idx = users.findIndex((u) => u.id === user.id);
