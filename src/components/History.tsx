@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
 import { getUserRecords, buildEditTempId } from '../storage';
@@ -10,20 +10,8 @@ interface HistoryProps {
 }
 
 export default function History({ user, onLogout }: HistoryProps) {
-  const [records, setRecords] = useState<AudioRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const records: AudioRecord[] = getUserRecords(user.id);
   const [selected, setSelected] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const r = await getUserRecords(user.id);
-      if (cancelled) return;
-      setRecords(r);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [user.id]);
 
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -56,19 +44,6 @@ export default function History({ user, onLogout }: HistoryProps) {
 
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
 
-  if (loading) {
-    return (
-      <Layout user={user} onLogout={onLogout}>
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-white border-r-4 border-transparent mb-4"></div>
-            <div className="text-white text-sm font-medium">Tarix yuklanmoqda…</div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout user={user} onLogout={onLogout}>
       <div className="space-y-6">
@@ -78,130 +53,129 @@ export default function History({ user, onLogout }: HistoryProps) {
               <span>📚</span> Amaliyot tarixi
             </h2>
             <div className="flex gap-3">
-              <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium">
-                📝 {records.length} ta audio
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
+                <span className="text-blue-600">🎧</span>
+                <span className="font-semibold text-blue-700">
+                  {records.length} ta audio
+                </span>
               </div>
-              <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg font-medium">
-                ✍️ {totalWords} so'z
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-lg">
+                <span className="text-emerald-600">📝</span>
+                <span className="font-semibold text-emerald-700">{totalWords} so'z</span>
               </div>
             </div>
           </div>
           <p className="text-gray-500 text-sm">
-            Bu yerda so'nggi 24 soat ichida saqlangan amaliyotlaringiz ko'rsatiladi (audiolar vaqtinchalik 1 kun saqlanadi)
+            Oxirgi 1 kun ichida saqlangan matnlaringiz. 1 kundan so'ng audio va matn
+            avtomatik o'chadi, faqat statistika qoladi.
           </p>
         </div>
 
         {records.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-xl p-16 text-center">
-            <div className="text-7xl mb-4">📭</div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">
-              Hali hech qanday amaliyot yo'q
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <div className="text-6xl mb-4">📭</div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+              Hali audio yuklamadingiz
             </h3>
             <p className="text-gray-500 mb-6">
-              Asosiy saxifaga o'ting va birinchi audioni yuklab, mashq qilishni boshlang!
+              Audioni tinglab, matn yozishni bugun boshlang!
             </p>
-            <a
-              href="/"
-              className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-sky-600 transition-all shadow-lg"
+            <Link
+              to="/"
+              className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold rounded-xl shadow-lg"
             >
-              Asosiy saxifaga o'tish
-            </a>
+              Audio yuklash →
+            </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {records.map((record, index) => (
-              <div
-                key={record.id}
-                className="bg-white rounded-2xl shadow-xl overflow-hidden transition-all hover:shadow-2xl"
-              >
+          <div className="space-y-3">
+            {records.map((r) => {
+              const isOpen = selected === r.id;
+              const timeLeft = getTimeLeft(r.expiresAt);
+              const expired = new Date(r.expiresAt).getTime() < Date.now();
+              return (
                 <div
-                  className="p-5 cursor-pointer"
-                  onClick={() =>
-                    setSelected(selected === record.id ? null : record.id)
-                  }
+                  key={r.id}
+                  className={`bg-white rounded-2xl shadow-lg overflow-hidden transition-all ${
+                    isOpen ? 'ring-2 ring-blue-400' : 'hover:shadow-xl'
+                  }`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center text-white font-bold">
-                        {index + 1}
+                  <div
+                    className="p-5 sm:p-6 cursor-pointer"
+                    onClick={() => setSelected(isOpen ? null : r.id)}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
+                            expired
+                              ? 'bg-gray-100 text-gray-500'
+                              : 'bg-gradient-to-br from-blue-500 to-sky-500 text-white'
+                          }`}
+                        >
+                          {expired ? '📦' : '🎵'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-gray-800 truncate">
+                            {r.audioName}
+                          </div>
+                          <div className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-2 sm:gap-4 mt-1">
+                            <span>📅 {formatDateTime(r.createdAt)}</span>
+                            <span className={expired ? 'text-red-500' : 'text-amber-600'}>
+                              ⏳ {timeLeft}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
-                          <span>🎵</span> {record.audioName}
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {formatDateTime(record.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">
-                        {record.wordCount} so'z
-                      </div>
-                      <div
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                          getTimeLeft(record.expiresAt).includes('tugagan')
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        ⏳ {getTimeLeft(record.expiresAt)}
-                      </div>
-                      <Link
-                        to={`/transcribe/${buildEditTempId(record.id)}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white rounded-lg text-sm font-semibold shadow transition-all"
-                      >
-                        <span>🔁</span> Davom etish
-                      </Link>
-                      <div
-                        role="button"
-                        aria-label="expand"
-                        className="text-gray-400 text-xl select-none"
-                      >
-                        {selected === record.id ? '▲' : '▼'}
+                      <div className="flex items-center gap-2 sm:gap-4">
+                        <div className="text-center">
+                          <div className="text-lg sm:text-xl font-bold text-blue-700">
+                            {r.wordCount}
+                          </div>
+                          <div className="text-[10px] sm:text-xs text-gray-500">so'z</div>
+                        </div>
+                        <div className="text-center hidden sm:block">
+                          <div className="text-lg font-bold text-emerald-600">
+                            {formatTime(r.progressSeconds)}
+                          </div>
+                          <div className="text-xs text-gray-500">o'rn</div>
+                        </div>
+                        <Link
+                          to={`/transcribe/${buildEditTempId(r.id)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
+                            expired
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed pointer-events-none'
+                              : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white shadow-md'
+                          }`}
+                        >
+                          {expired ? 'Muddati o\'tgan' : 'Davom etish →'}
+                        </Link>
                       </div>
                     </div>
                   </div>
+                  {isOpen && !expired && r.transcript && (
+                    <div className="border-t border-gray-100 p-5 sm:p-6 bg-gray-50">
+                      <div className="text-xs text-gray-500 mb-2 font-medium">
+                        📄 Matn (preview)
+                      </div>
+                      <div
+                        className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap leading-relaxed"
+                        style={{
+                          fontFamily:
+                            "'Times New Roman', Georgia, 'Noto Serif', serif",
+                          lineHeight: '1.8',
+                        }}
+                      >
+                        {r.transcript.length > 600
+                          ? r.transcript.slice(0, 600) + '…'
+                          : r.transcript}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                {selected === record.id && (
-                  <div className="border-t border-gray-100 bg-gray-50 p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                      <span className="text-sm font-semibold text-gray-700">
-                        Yozilgan matn:
-                      </span>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                        {record.progressSeconds > 0 && (
-                          <span className="bg-sky-100 text-sky-700 px-2.5 py-1 rounded-lg font-medium">
-                            ▶️ {formatTime(record.progressSeconds)} da qolgan
-                          </span>
-                        )}
-                        <span className="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-lg font-medium">
-                          📝 {record.transcript.length} belgi
-                        </span>
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-xl p-4 border border-blue-200 max-h-80 overflow-y-auto">
-                      <p className="text-gray-800 whitespace-pre-wrap leading-relaxed font-mono text-sm">
-                        {record.transcript || <span className="text-gray-400 italic">Hali matn yozilmagan…</span>}
-                      </p>
-                    </div>
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                      <p className="text-xs text-gray-500">
-                        💡 <strong>Davom etish</strong> orqali tahrirlashingiz va audio qolgan joydan tinglashingiz mumkin (audio fayl hozirgi sessiyada bo'lsa).
-                      </p>
-                      <Link
-                        to={`/transcribe/${buildEditTempId(record.id)}`}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white rounded-xl font-bold shadow transition-all"
-                      >
-                        <span>🔁</span> O'zgartirish / Davom etish
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

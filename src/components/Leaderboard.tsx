@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { User } from '../types';
-import { getLeaderboard, getUserRecords } from '../storage';
+import { User, AudioRecord } from '../types';
+import { getGlobalLeaderboard, getUserRecords } from '../storage';
 import Layout from './Layout';
 
 interface LeaderboardProps {
@@ -10,16 +10,17 @@ interface LeaderboardProps {
 
 export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
   const [users, setUsers] = useState<User[]>([]);
-  const [myRecords, setMyRecords] = useState<Awaited<ReturnType<typeof getUserRecords>>>([]);
+  const [myRecords, setMyRecords] = useState<AudioRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [u, recs] = await Promise.all([getLeaderboard(), getUserRecords(user.id)]);
+      const localRecs = getUserRecords(user.id);
+      const globalUsers = await getGlobalLeaderboard();
       if (cancelled) return;
-      setUsers(u);
-      setMyRecords(recs);
+      setUsers(globalUsers);
+      setMyRecords(localRecs);
       setLoading(false);
     })();
     return () => { cancelled = true; };

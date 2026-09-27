@@ -28,24 +28,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (user && justLoggedIn) {
-      (async () => {
-        const seen = await hasSeenTelegramModal(user.id);
-        if (cancelled) return;
-        if (!seen) {
-          timer = setTimeout(() => {
-            setShowTgModal(true);
-            setJustLoggedIn(false);
-          }, 700);
-        } else {
+      if (!hasSeenTelegramModal(user.id)) {
+        timer = setTimeout(() => {
+          setShowTgModal(true);
           setJustLoggedIn(false);
-        }
-      })();
+        }, 700);
+      } else {
+        setJustLoggedIn(false);
+      }
     }
     return () => {
-      cancelled = true;
       if (timer) clearTimeout(timer);
     };
   }, [user, justLoggedIn]);
@@ -61,12 +55,12 @@ function App() {
   };
 
   const handleTgClose = () => {
-    if (user) void markTelegramModalSeen(user.id);
+    if (user) markTelegramModalSeen(user.id);
     setShowTgModal(false);
   };
 
   const handleTgJoined = () => {
-    if (user) void markTelegramModalSeen(user.id);
+    if (user) markTelegramModalSeen(user.id);
   };
 
   if (loading) {

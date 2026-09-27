@@ -23,7 +23,7 @@ export default function Login({ onAuth }: LoginProps) {
 
   const resetErr = () => setError('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     resetErr();
 
@@ -34,15 +34,18 @@ export default function Login({ onAuth }: LoginProps) {
     if (!emailRegex.test(email)) return setError('To\'g\'ri email kiriting');
 
     setLoading(true);
-    try {
+    setTimeout(() => {
       if (tab === 'register') {
         if (!firstName.trim() || !lastName.trim()) {
+          setLoading(false);
           return setError('Ism va familyani kiriting');
         }
         if (password.length < 4) {
+          setLoading(false);
           return setError('Parol kamida 4 ta belgi bo\'lsin');
         }
         if (password !== confirmPassword) {
+          setLoading(false);
           return setError('Parollar mos emas');
         }
         const existedEmail = getUsers().some(
@@ -50,25 +53,26 @@ export default function Login({ onAuth }: LoginProps) {
         );
         if (existedEmail) {
           setTab('login');
+          setLoading(false);
           return setError('Bu email mavjud. Pastdan Login qismiga o\'tdingiz, parol bilan kiring.');
         }
-        const res = await registerUser(firstName, lastName, email, password);
+        const res = registerUser(firstName, lastName, email, password);
         if (!res.ok || !res.user) {
+          setLoading(false);
           return setError(res.error || 'Xatolik');
         }
+        setLoading(false);
         onAuth(res.user, true);
       } else {
-        const res = await loginUser(email, password);
+        const res = loginUser(email, password);
         if (!res.ok || !res.user) {
+          setLoading(false);
           return setError(res.error || 'Xatolik');
         }
+        setLoading(false);
         onAuth(res.user, false);
       }
-    } catch (err) {
-      setError('Xatolik yuz berdi');
-    } finally {
-      setLoading(false);
-    }
+    }, 400);
   };
 
   return (
