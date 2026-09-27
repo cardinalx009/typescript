@@ -29,51 +29,18 @@ interface InitialData {
   pending: (PendingAudioData & { url?: string }) | null;
 }
 
-function computeInitial(tempId: string | undefined, userId: string): InitialData | null {
-  if (!tempId) return null;
-
-  const editPrefix = buildEditTempId('').slice(0, 4);
-  if (tempId.startsWith(editPrefix)) {
-    const recordId = tempId.slice(4);
-    const rec = getRecord(recordId);
-    if (!rec || rec.userId !== userId) return null;
-    return {
-      mode: 'edit',
-      recordId: rec.id,
-      audioName: rec.audioName,
-      transcript: rec.transcript,
-      progressSeconds: rec.progressSeconds,
-      pending: null,
-    };
-  }
-
-  const pending = getPendingAudio(tempId);
-  if (!pending) return null;
-  let linkedRecord: AudioRecord | null = null;
-  if (pending.recordId) linkedRecord = getRecord(pending.recordId);
-  if (linkedRecord && linkedRecord.userId !== userId) linkedRecord = null;
-  return {
-    mode: linkedRecord ? 'edit' : 'new',
-    recordId: linkedRecord?.id || null,
-    audioName: linkedRecord?.audioName || pending.name.replace(/\.[^/.]+$/, ''),
-    transcript: linkedRecord?.transcript || '',
-    progressSeconds: linkedRecord?.progressSeconds || 0,
-    pending,
-  };
-}
-
 export default function Transcribe({ user, onLogout }: TranscribeProps) {
   const { tempId } = useParams<{ tempId: string }>();
   const navigate = useNavigate();
 
-  const [initial] = useState<InitialData | null>(() => computeInitial(tempId, user.id));
+  const [initial, setInitial] = useState<InitialData | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  const baseAudioSrc = initial?.pending?.url || undefined;
   const [overrideAudioSrc, setOverrideAudioSrc] = useState<string | undefined>(undefined);
-  const [audioName, setAudioName] = useState(initial?.audioName || '');
-  const [transcript, setTranscript] = useState(initial?.transcript || '');
-  const [recordId, setRecordId] = useState<string | null>(initial?.recordId || null);
-  const [stepOne, setStepOne] = useState<boolean>(!!initial?.recordId);
+  const [audioName, setAudioName] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [recordId, setRecordId] = useState<string | null>(null);
+  const [stepOne, setStepOne] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -83,7 +50,9 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   const [hintVisible, setHintVisible] = useState(true);
   const [resumed, setResumed] = useState(false);
   const [audioReUploadName, setAudioReUploadName] = useState<string>('');
+  const [recentCount, setRecentCount] = useState(0);
 
+  const baseAudioSrc = initial?.pending?.url || undefined;
   const audioSrc = overrideAudioSrc || baseAudioSrc;
   const isEditWithoutAudio = !!initial && initial.mode === 'edit' && !baseAudioSrc;
 
@@ -102,11 +71,87 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setInitialLoading(true);
+      if (!tempId) {
+        if (!cancelled) setInitial(null);
+        setInitialLoading(false);
+        return;
+      }
+      const editPrefix = buildEditTempId('').slice(0, 4);
+      if (tempId.startsWith(editPrefix)) {
+        const recordIdRaw = tempId.slice(4);
+        const rec = await getRecord(recordIdRaw);
+        if (!rec || rec.userId !== user.id) {
+          if (!cancelled) setInitial(null);
+          setInitialLoading(false);
+          return;
+        }
+        if (!cancelled) {
+          setInitial({
+            mode: 'edit',
+            recordId: rec.id,
+            audioName: rec.audioName,
+            transcript: rec.transcript,
+            progressSeconds: rec.progressSeconds,
+            pending: null,
+          });
+          setRecordId(rec.id);
+          setStepOne(true);
+        }
+        setInitialLoading(false);
+        return;
+      }
+
+      const pending = await getPendingAudio(tempId);
+      if (!pending) {
+        if (!cancelled) setInitial(null);
+        setInitialLoading(false);
+        return;
+      }
+      let linkedRecord: AudioRecord | null = null;
+      if (pending.recordId) {
+        const r = await getRecord(pending.recordId);
+        if (r && r.userId === user.id) linkedRecord = r;
+      }
+      if (!cancelled) {
+        const data: InitialData = {
+          mode: linkedRecord ? 'edit' : 'new',
+          recordId: linkedRecord?.id || null,
+          audioName: linkedRecord?.audioName || pending.name.replace(/\.[^/.]+$/, ''),
+          transcript: linkedRecord?.transcript || '',
+          progressSeconds: linkedRecord?.progressSeconds || 0,
+          pending,
+        };
+        setInitial(data);
+        setAudioName(data.audioName);
+        setTranscript(data.transcript);
+        if (data.recordId) {
+          setRecordId(data.recordId);
+          setStepOne(true);
+        }
+      }
+      setInitialLoading(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempId, user.id]);
+
+  useEffect(() => {
+    (async () => {
+      const recs = await getUserRecords(user.id);
+      setRecentCount(recs.length);
+    })();
+  }, [user.id, recordId, transcript, audioName]);
+
+  useEffect(() => {
+    if (initialLoading) return;
     if (!initial) {
       const timer = setTimeout(() => navigate('/', { replace: true }), 4000);
       return () => clearTimeout(timer);
     }
-  }, [initial, navigate]);
+  }, [initial, initialLoading, navigate]);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -139,15 +184,15 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   }, [stepOne, transcript.length]);
 
   useEffect(() => {
-    if (stepOne && audioRef.current && audioSrc && !resumed) {
-      const seconds = initial?.progressSeconds || 0;
+    if (stepOne && audioRef.current && audioSrc && !resumed && initial) {
+      const seconds = initial.progressSeconds || 0;
       if (seconds > 0) {
         audioRef.current.currentTime = seconds;
         setCurrentTime(seconds);
       }
       setResumed(true);
     }
-  }, [stepOne, audioSrc, initial?.progressSeconds, resumed]);
+  }, [stepOne, audioSrc, initial, resumed]);
 
   useEffect(() => {
     return () => {
@@ -161,7 +206,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overrideAudioSrc]);
+  }, [overrideAudioSrc, initial?.pending, tempId]);
 
   const recordIdRef = useRef<string | null>(recordId);
   useEffect(() => { recordIdRef.current = recordId; }, [recordId]);
@@ -171,8 +216,6 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
 
   const transcriptRef = useRef(transcript);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
-
-  const recentCount = getUserRecords(user.id).length;
 
   const handleReUploadAudio = (file: File | null) => {
     if (!file) return;
@@ -194,6 +237,18 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     setOverrideAudioSrc(url);
     setResumed(false);
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-r-4 border-transparent mb-4"></div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Ma'lumotlar yuklanmoqda...</h2>
+          <p className="text-gray-500 text-sm">Iltimos kuting</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!initial) {
     return (
@@ -244,7 +299,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       const now = Date.now();
       if (now - lastProgressSaveRef.current > 3500) {
         lastProgressSaveRef.current = now;
-        ensureSaved(t);
+        void ensureSaved(t);
       }
     }
   };
@@ -259,7 +314,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
       lastProgressSaveRef.current = Date.now();
-      scheduleSave({ progressSeconds: time });
+      void scheduleSave({ progressSeconds: time });
     }
   };
 
@@ -283,13 +338,13 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   const sizeMB = initial.pending ? (initial.pending.size / 1024 / 1024).toFixed(2) : '—';
   const initialProgress = initial.progressSeconds || 0;
 
-  const ensureSaved = (progressSecondsOverride?: number) => {
+  const ensureSaved = async (progressSecondsOverride?: number) => {
     const progress =
       progressSecondsOverride !== undefined ? progressSecondsOverride : currentTimeRef.current;
-    scheduleSave({ progressSeconds: progress });
+    await scheduleSave({ progressSeconds: progress });
   };
 
-  const scheduleSave = (patch: { transcript?: string; audioName?: string; progressSeconds?: number }) => {
+  const scheduleSave = async (patch: { transcript?: string; audioName?: string; progressSeconds?: number }) => {
     if (!stepOne) return;
     if (!audioNameRef.current.trim()) return;
 
@@ -302,7 +357,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       if (!nameToSave || (!transcriptToSave && progressToSave < 1)) return;
       setSaveStatus('saving');
       try {
-        const rec = addRecord(user.id, nameToSave, transcriptToSave, progressToSave, undefined, tempId || undefined);
+        const rec = await addRecord(user.id, nameToSave, transcriptToSave, progressToSave, undefined, tempId || undefined);
         setRecordId(rec.id);
         recordIdRef.current = rec.id;
         if (tempId && initial.pending) linkTempIdToRecord(tempId, rec.id);
@@ -316,7 +371,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
 
     setSaveStatus('saving');
     try {
-      updateRecord(curRecordId, {
+      await updateRecord(curRecordId, {
         transcript: transcriptToSave,
         audioName: nameToSave,
         progressSeconds: progressToSave,
@@ -333,7 +388,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     setTranscript(next);
     if (transcriptDebounceRef.current) window.clearTimeout(transcriptDebounceRef.current);
     transcriptDebounceRef.current = window.setTimeout(() => {
-      scheduleSave({ transcript: next, progressSeconds: currentTimeRef.current });
+      void scheduleSave({ transcript: next, progressSeconds: currentTimeRef.current });
     }, 450);
   };
 
@@ -342,15 +397,15 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     setAudioName(next);
     if (audioNameDebounceRef.current) window.clearTimeout(audioNameDebounceRef.current);
     audioNameDebounceRef.current = window.setTimeout(() => {
-      scheduleSave({ audioName: next, progressSeconds: currentTimeRef.current });
+      void scheduleSave({ audioName: next, progressSeconds: currentTimeRef.current });
     }, 400);
   };
 
-  const goToWrite = (e: React.FormEvent) => {
+  const goToWrite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!audioName.trim()) return;
     if (initialProgress > 0 || transcript.length > 0) {
-      scheduleSave({ progressSeconds: initialProgress, transcript });
+      await scheduleSave({ progressSeconds: initialProgress, transcript });
     }
     setStepOne(true);
   };
@@ -361,17 +416,17 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       return;
     }
     lastProgressSaveRef.current = Date.now();
-    scheduleSave({ progressSeconds: currentTimeRef.current, transcript, audioName });
+    void scheduleSave({ progressSeconds: currentTimeRef.current, transcript, audioName });
   };
 
-  const handleSaveAndExit = () => {
+  const handleSaveAndExit = async () => {
     if (audioName.trim()) {
       lastProgressSaveRef.current = Date.now();
       try {
         if (!recordIdRef.current) {
-          addRecord(user.id, audioName, transcript, currentTimeRef.current);
+          await addRecord(user.id, audioName, transcript, currentTimeRef.current);
         } else {
-          updateRecord(recordIdRef.current, {
+          await updateRecord(recordIdRef.current, {
             transcript,
             audioName,
             progressSeconds: currentTimeRef.current,
@@ -389,19 +444,21 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     if (!audioNameRef.current.trim()) return;
     e.preventDefault();
     e.returnValue = '';
-    try {
-      if (!recordIdRef.current) {
-        addRecord(user.id, audioNameRef.current, transcriptRef.current, currentTimeRef.current);
-      } else {
-        updateRecord(recordIdRef.current, {
-          transcript: transcriptRef.current,
-          audioName: audioNameRef.current,
-          progressSeconds: currentTimeRef.current,
-        });
+    void (async () => {
+      try {
+        if (!recordIdRef.current) {
+          await addRecord(user.id, audioNameRef.current, transcriptRef.current, currentTimeRef.current);
+        } else {
+          await updateRecord(recordIdRef.current, {
+            transcript: transcriptRef.current,
+            audioName: audioNameRef.current,
+            progressSeconds: currentTimeRef.current,
+          });
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    })();
   };
 
   useEffect(() => {

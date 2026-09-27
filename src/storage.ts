@@ -42,7 +42,7 @@ export const setCurrentUser = (user: User | null) => {
   }
 };
 
-const recalcUserTotalWords = (userId: string) => {
+const recalcUserTotalWordsLocal = (userId: string) => {
   const users = getUsers();
   const records = getRecordsRaw();
   const words = records
@@ -66,16 +66,28 @@ export type AuthResult =
 
 const API_TIMEOUT_MS = 4000;
 
-const fetchJson = async (path: string, body: unknown) => {
+export const apiCall = async (
+  path: string,
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',
+  body?: unknown,
+  extra?: RequestInit
+) => {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-    const resp = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const init: RequestInit = {
+      method,
       signal: controller.signal,
-    });
+      ...(extra || {}),
+    };
+    const isFormData = body instanceof FormData;
+    if (!isFormData && body !== undefined && method !== 'GET') {
+      init.headers = { 'Content-Type': 'application/json', ...(init.headers || {}) };
+      init.body = JSON.stringify(body);
+    } else if (isFormData) {
+      init.body = body;
+    }
+    const resp = await fetch(path, init);
     clearTimeout(timeoutId);
     let data: any = null;
     try { data = await resp.json(); } catch { data = null; }
@@ -99,13 +111,21 @@ const upsertLocalUser = (u: User) => {
   saveUsers(users);
 };
 
+const upsertLocalRecord = (r: AudioRecord) => {
+  const records = getRecordsRaw();
+  const idx = records.findIndex((x) => x.id === r.id);
+  if (idx >= 0) records[idx] = { ...records[idx], ...r };
+  else records.unshift(r);
+  saveRecordsRaw(records);
+};
+
 export const registerUser = async (
   firstName: string,
   lastName: string,
   email: string,
   password: string
 ): Promise<AuthResult> => {
-  const api = await fetchJson('/api/auth/register', { firstName, lastName, email, password });
+  const api = await apiCall('/api/auth/register', 'POST', { firstName, lastName, email, password });
   if (api.ok && api.data?.user) {
     const u: User = {
       id: api.data.user.id,
@@ -144,7 +164,7 @@ export const registerUser = async (
 };
 
 export const loginUser = async (email: string, password: string): Promise<AuthResult> => {
-  const api = await fetchJson('/api/auth/login', { email, password });
+  const api = await apiCall('/api/auth/login', 'POST', { email, password });
   if (api.ok && api.data?.user) {
     const u: User = {
       id: api.data.user.id,
@@ -206,7 +226,44 @@ const saveSessionUrlBucket = (b: Record<string, string>) => {
   }
 };
 
-export const savePendingAudio = (file: File): PendingAudioData & { url: string } => {
+export const savePendingAudio = async (
+  file: File,
+  userId?: string
+): Promise<PendingAudioData & { url: string }> => {
+  let uploaded: (PendingAudioData & { url: string; createdAt: any }) | null = null;
+  try {
+    const form = new FormData();
+    form.append('audio', file);
+    if (userId) form.append('userId', userId);
+    const resp = await apiCall('/api/upload/audio', 'POST', form);
+    if (resp.ok && resp.data?.data) {
+      const d = resp.data.data;
+      const ca = d.createdAt ? new Date(d.createdAt).getTime() : Date.now();
+      const pending: PendingAudioData & { url: string } = {
+        tempId: d.tempId,
+        name: d.name || file.name,
+        size: typeof d.size === 'number' ? d.size : file.size,
+        createdAt: ca,
+        url: d.url || `/api/audio/${d.tempId}`,
+        recordId: d.recordId,
+      };
+      const bucket = getPendingBucket();
+      bucket[pending.tempId] = {
+        tempId: pending.tempId,
+        name: pending.name,
+        size: pending.size,
+        createdAt: pending.createdAt,
+        recordId: pending.recordId,
+      };
+      savePendingBucket(bucket);
+      uploaded = pending;
+    }
+  } catch {
+    uploaded = null;
+  }
+
+  if (uploaded) return uploaded;
+
   const url = URL.createObjectURL(file);
   const tempId = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   const pending: PendingAudioData = {
@@ -224,9 +281,37 @@ export const savePendingAudio = (file: File): PendingAudioData & { url: string }
   return { ...pending, url };
 };
 
-export const getPendingAudio = (
+export const getPendingAudio = async (
   tempId: string
-): (PendingAudioData & { url?: string }) | null => {
+): Promise<(PendingAudioData & { url?: string }) | null> => {
+  try {
+    const resp = await apiCall(`/api/pending/${tempId}`, 'GET');
+    if (resp.ok && resp.data?.ok && resp.data.data) {
+      const d = resp.data.data;
+      const ca = d.createdAt ? new Date(d.createdAt).getTime() : Date.now();
+      const result: PendingAudioData & { url?: string } = {
+        tempId: d.tempId,
+        name: d.name,
+        size: d.size,
+        createdAt: ca,
+        url: d.url || `/api/audio/${d.tempId}`,
+        recordId: d.recordId,
+      };
+      const bucket = getPendingBucket();
+      bucket[tempId] = {
+        tempId: result.tempId,
+        name: result.name,
+        size: result.size,
+        createdAt: result.createdAt,
+        recordId: result.recordId,
+      };
+      savePendingBucket(bucket);
+      return result;
+    }
+  } catch {
+    /* fallthrough */
+  }
+
   const bucket = getPendingBucket();
   const p = bucket[tempId];
   if (!p) return null;
@@ -294,28 +379,146 @@ export const getRecords = (): AudioRecord[] => {
   return records;
 };
 
-export const getUserRecords = (userId: string): AudioRecord[] => {
+export const getUserRecordsLocal = (userId: string): AudioRecord[] => {
   return getRecords()
     .filter((r) => r.userId === userId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 };
 
-export const getRecord = (id: string): AudioRecord | null => {
+export const getRecordLocal = (id: string): AudioRecord | null => {
   return getRecords().find((r) => r.id === id) || null;
 };
 
-export const addRecord = (
+export const getUserRecords = async (userId: string): Promise<AudioRecord[]> => {
+  try {
+    const resp = await apiCall(`/api/users/${userId}/records`, 'GET');
+    if (resp.ok && resp.data?.ok && Array.isArray(resp.data.records)) {
+      const list: AudioRecord[] = resp.data.records.map((r: any) => ({
+        id: r.id,
+        userId: r.userId,
+        audioName: r.audioName,
+        audioObjectKey: r.audioObjectKey,
+        transcript: r.transcript || '',
+        wordCount: typeof r.wordCount === 'number' ? r.wordCount : 0,
+        progressSeconds: typeof r.progressSeconds === 'number' ? r.progressSeconds : 0,
+        createdAt: r.createdAt,
+        expiresAt: r.expiresAt,
+        lastEditedAt: r.lastEditedAt,
+      }));
+      for (const r of list) upsertLocalRecord(r);
+      const total = list.reduce((s, r) => s + r.wordCount, 0);
+      const cur = getCurrentUser();
+      if (cur && cur.id === userId) {
+        const next = { ...cur, totalWords: total };
+        setCurrentUser(next);
+        upsertLocalUser(next);
+      }
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  } catch {
+    /* fallback */
+  }
+  return getUserRecordsLocal(userId);
+};
+
+export const getRecord = async (id: string): Promise<AudioRecord | null> => {
+  try {
+    const resp = await apiCall(`/api/records/${id}`, 'GET');
+    if (resp.ok && resp.data?.ok && resp.data.record) {
+      const r = resp.data.record;
+      const rec: AudioRecord = {
+        id: r.id,
+        userId: r.userId,
+        audioName: r.audioName,
+        audioObjectKey: r.audioObjectKey,
+        transcript: r.transcript || '',
+        wordCount: typeof r.wordCount === 'number' ? r.wordCount : 0,
+        progressSeconds: typeof r.progressSeconds === 'number' ? r.progressSeconds : 0,
+        createdAt: r.createdAt,
+        expiresAt: r.expiresAt,
+        lastEditedAt: r.lastEditedAt,
+      };
+      upsertLocalRecord(rec);
+      return rec;
+    }
+  } catch {
+    /* fallback */
+  }
+  return getRecordLocal(id);
+};
+
+const syncCurrentUserWords = (userId: string) => {
+  const users = getUsers();
+  const records = getRecordsRaw();
+  const words = records
+    .filter((r) => r.userId === userId)
+    .reduce((s, r) => s + r.wordCount, 0);
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx >= 0) {
+    users[idx].totalWords = words;
+    saveUsers(users);
+  }
+  const cur = getCurrentUser();
+  if (cur && cur.id === userId) {
+    const updated = { ...cur, totalWords: words };
+    setCurrentUser(updated);
+    upsertLocalUser(updated);
+  }
+  return words;
+};
+
+export const addRecord = async (
   userId: string,
   audioName: string,
   transcript: string,
   progressSeconds = 0,
-  baseAudioData?: unknown,
+  _baseAudioData?: unknown,
   tempId?: string
-): AudioRecord => {
+): Promise<AudioRecord> => {
   const wordCount = transcript.trim() ? transcript.trim().split(/\s+/).length : 0;
   const now = Date.now();
   const nowISO = new Date(now).toISOString();
   const expiresISO = new Date(now + ONE_DAY_MS).toISOString();
+
+  let serverRec: AudioRecord | null = null;
+  try {
+    const resp = await apiCall('/api/records', 'POST', {
+      userId,
+      audioName: audioName.trim(),
+      transcript,
+      progressSeconds,
+      tempId,
+    });
+    if (resp.ok && resp.data?.record) {
+      const r = resp.data.record;
+      serverRec = {
+        id: r.id,
+        userId: r.userId,
+        audioName: r.audioName,
+        audioObjectKey: r.audioObjectKey,
+        transcript: r.transcript || '',
+        wordCount: typeof r.wordCount === 'number' ? r.wordCount : wordCount,
+        progressSeconds: typeof r.progressSeconds === 'number' ? r.progressSeconds : progressSeconds,
+        createdAt: r.createdAt || nowISO,
+        expiresAt: r.expiresAt || expiresISO,
+        lastEditedAt: r.lastEditedAt || nowISO,
+      };
+      upsertLocalRecord(serverRec);
+      const cur = getCurrentUser();
+      if (cur && cur.id === userId && typeof resp.data.userTotal === 'number') {
+        const next = { ...cur, totalWords: resp.data.userTotal };
+        setCurrentUser(next);
+        upsertLocalUser(next);
+      } else {
+        syncCurrentUserWords(userId);
+      }
+      if (tempId) linkTempIdToRecord(tempId, serverRec.id);
+      return serverRec;
+    }
+  } catch {
+    /* fallback local */
+  }
+
   const record: AudioRecord = {
     id: 'r_' + Math.random().toString(36).slice(2, 10) + now.toString(36),
     userId,
@@ -330,27 +533,40 @@ export const addRecord = (
   const records = getRecordsRaw();
   records.push(record);
   saveRecordsRaw(records);
-  recalcUserTotalWords(userId);
+  recalcUserTotalWordsLocal(userId);
   if (tempId) linkTempIdToRecord(tempId, record.id);
-  const cur = getCurrentUser();
-  if (cur && cur.id === userId) {
-    const words = recalcUserTotalWords(userId);
-    const updated = { ...cur, totalWords: words };
-    setCurrentUser(updated);
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === userId);
-    if (idx >= 0) {
-      users[idx] = updated;
-      saveUsers(users);
-    }
-  }
+  syncCurrentUserWords(userId);
   return record;
 };
 
-export const updateRecord = (
+export const updateRecord = async (
   id: string,
   patch: { transcript?: string; audioName?: string; progressSeconds?: number }
-): AudioRecord | null => {
+): Promise<AudioRecord | null> => {
+  try {
+    const resp = await apiCall(`/api/records/${id}`, 'PATCH', patch);
+    if (resp.ok && resp.data?.record) {
+      const r = resp.data.record;
+      const rec: AudioRecord = {
+        id: r.id,
+        userId: r.userId,
+        audioName: r.audioName,
+        audioObjectKey: r.audioObjectKey,
+        transcript: r.transcript || '',
+        wordCount: typeof r.wordCount === 'number' ? r.wordCount : 0,
+        progressSeconds: typeof r.progressSeconds === 'number' ? r.progressSeconds : 0,
+        createdAt: r.createdAt,
+        expiresAt: r.expiresAt,
+        lastEditedAt: r.lastEditedAt,
+      };
+      upsertLocalRecord(rec);
+      syncCurrentUserWords(rec.userId);
+      return rec;
+    }
+  } catch {
+    /* fallback local */
+  }
+
   const records = getRecordsRaw();
   const idx = records.findIndex((r) => r.id === id);
   if (idx < 0) return null;
@@ -359,20 +575,10 @@ export const updateRecord = (
   if (patch.audioName !== undefined) r.audioName = patch.audioName;
   if (patch.progressSeconds !== undefined) r.progressSeconds = patch.progressSeconds;
   r.wordCount = r.transcript.trim() ? r.transcript.trim().split(/\s+/).length : 0;
+  r.lastEditedAt = new Date().toISOString();
   saveRecordsRaw(records);
-  recalcUserTotalWords(r.userId);
-  const cur = getCurrentUser();
-  if (cur && cur.id === r.userId) {
-    const words = recalcUserTotalWords(r.userId);
-    const updated = { ...cur, totalWords: words };
-    setCurrentUser(updated);
-    const users = getUsers();
-    const ui = users.findIndex((u) => u.id === r.userId);
-    if (ui >= 0) {
-      users[ui] = updated;
-      saveUsers(users);
-    }
-  }
+  recalcUserTotalWordsLocal(r.userId);
+  syncCurrentUserWords(r.userId);
   return r;
 };
 
@@ -387,7 +593,12 @@ export const hasSeenTelegramModal = (userId: string): boolean => {
   return list.includes(userId);
 };
 
-export const markTelegramModalSeen = (userId: string) => {
+export const markTelegramModalSeen = async (userId: string) => {
+  try {
+    await apiCall(`/api/telegram/seen/${userId}`, 'POST');
+  } catch {
+    /* ignore */
+  }
   const raw = localStorage.getItem(TELEGRAM_JOINED_KEY);
   const list: string[] = raw ? JSON.parse(raw) : [];
   if (!list.includes(userId)) {
@@ -406,7 +617,7 @@ export const getGlobalLeaderboard = async (): Promise<User[]> => {
       const data = await resp.json();
       const list = data?.users || data;
       if (Array.isArray(list) && list.length > 0) {
-        return list
+        const mapped: User[] = list
           .map((u) => ({
             id: u.id,
             firstName: u.firstName || '',
@@ -417,6 +628,8 @@ export const getGlobalLeaderboard = async (): Promise<User[]> => {
             joinedAt: u.createdAt || u.joinedAt || new Date().toISOString(),
           }))
           .sort((a, b) => (b.totalWords || 0) - (a.totalWords || 0));
+        for (const u of mapped) upsertLocalUser(u);
+        return mapped;
       }
     }
   } catch {

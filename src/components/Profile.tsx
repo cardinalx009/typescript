@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { User, AudioRecord } from '../types';
-import { getUserRecords, saveUsers, getUsers, setCurrentUser, passwordHash } from '../storage';
+import { getUserRecords, saveUsers, getUsers, setCurrentUser, apiCall } from '../storage';
 import Layout from './Layout';
 
 interface ProfileProps {
@@ -9,7 +10,20 @@ interface ProfileProps {
 }
 
 export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
-  const records: AudioRecord[] = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadRecords = async () => {
+    setLoading(true);
+    const list = await getUserRecords(user.id);
+    setRecords(list);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void loadRecords();
+  }, [user.id]);
 
   const totalAudios = records.length;
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
@@ -32,15 +46,28 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
     onLogout();
   };
 
-  const handleRefreshStats = () => {
-    const users = getUsers();
-    const idx = users.findIndex((u) => u.id === user.id);
-    if (idx !== -1) {
-      const recs = getUserRecords(user.id);
-      users[idx].totalWords = recs.reduce((s, r) => s + r.wordCount, 0);
-      saveUsers(users);
-      setCurrentUser(users[idx]);
-      onUpdate(users[idx]);
+  const handleRefreshStats = async () => {
+    setRefreshing(true);
+    try {
+      const recs = await getUserRecords(user.id);
+      const words = recs.reduce((s, r) => s + r.wordCount, 0);
+      const users = getUsers();
+      const idx = users.findIndex((u) => u.id === user.id);
+      const updated: User = { ...user, totalWords: words };
+      if (idx !== -1) {
+        users[idx] = updated;
+        saveUsers(users);
+      }
+      try {
+        await apiCall(`/api/users/${user.id}`, 'PATCH', { totalWords: words });
+      } catch {
+        /* ignore */
+      }
+      setCurrentUser(updated);
+      onUpdate(updated);
+      setRecords(recs);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -64,9 +91,10 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
             <div className="mt-6 space-y-3">
               <button
                 onClick={handleRefreshStats}
-                className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-all"
+                disabled={refreshing}
+                className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-all disabled:opacity-60"
               >
-                🔄 Statistikani yangilash
+                {refreshing ? 'Yangilanmoqda…' : '🔄 Statistikani yangilash'}
               </button>
               <a
                 href="https://t.me/asadbekposts"
@@ -100,16 +128,16 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-600 to-sky-500 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">Jami so'zlar</div>
-                <div className="text-3xl font-bold mt-1">{user.totalWords}</div>
+                <div className="text-3xl font-bold mt-1">{loading ? '…' : user.totalWords}</div>
               </div>
               <div className="bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">Jami audiolar</div>
-                <div className="text-3xl font-bold mt-1">{totalAudios}</div>
+                <div className="text-3xl font-bold mt-1">{loading ? '…' : totalAudios}</div>
               </div>
               <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-5 text-white">
                 <div className="text-sm opacity-90">O'rtacha / audio</div>
                 <div className="text-3xl font-bold mt-1">
-                  {totalAudios > 0 ? Math.round(totalWords / totalAudios) : 0}
+                  {loading ? '…' : totalAudios > 0 ? Math.round(totalWords / totalAudios) : 0}
                 </div>
               </div>
             </div>

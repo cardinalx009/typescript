@@ -269,10 +269,49 @@ app.get('/api/users/:userId/records', async (req, res) => {
     const now = new Date();
     const recs = await AudioRecord.find({
       userId: req.params.userId,
-      expiresAt: { $gt: now },
     }).sort({ lastEditedAt: -1 }).lean();
-    res.json({ ok: true, records: recs.map(recordToJSON) });
+    const stripped = recs.map((r) => {
+      const expired = r.expiresAt && r.expiresAt < now;
+      if (expired) {
+        return recordToJSON({
+          ...r,
+          transcript: '',
+          audioObjectKey: undefined,
+        });
+      }
+      return recordToJSON(r);
+    });
+    res.json({ ok: true, records: stripped });
   } catch (e) {
+    res.status(500).json({ ok: false });
+  }
+});
+
+app.patch('/api/users/:userId', async (req, res) => {
+  try {
+    const { totalWords, firstName, lastName } = req.body || {};
+    const update = {};
+    if (typeof totalWords === 'number') update.totalWords = totalWords;
+    if (typeof firstName === 'string' && firstName.trim()) update.firstName = firstName.trim();
+    if (typeof lastName === 'string' && lastName.trim()) update.lastName = lastName.trim();
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ ok: false, error: 'Yangilanish uchun maydonlar yuborilmadi' });
+    }
+    const u = await User.findByIdAndUpdate(req.params.userId, { $set: update }, { new: true }).lean();
+    if (!u) return res.status(404).json({ ok: false });
+    res.json({
+      ok: true,
+      user: {
+        id: u._id.toString(),
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        totalWords: u.totalWords,
+        joinedAt: u.joinedAt.toISOString(),
+      },
+    });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ ok: false });
   }
 });

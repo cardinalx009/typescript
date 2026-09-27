@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
 import { getUserRecords, buildEditTempId } from '../storage';
@@ -10,8 +10,22 @@ interface HistoryProps {
 }
 
 export default function History({ user, onLogout }: HistoryProps) {
-  const records: AudioRecord[] = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const list = await getUserRecords(user.id);
+      if (!cancelled) {
+        setRecords(list);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
 
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -71,7 +85,14 @@ export default function History({ user, onLogout }: HistoryProps) {
           </p>
         </div>
 
-        {records.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-r-4 border-transparent mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-700">
+              Tarix yuklanmoqda...
+            </h3>
+          </div>
+        ) : records.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="text-6xl mb-4">📭</div>
             <h3 className="text-2xl font-bold text-gray-800 mb-2">

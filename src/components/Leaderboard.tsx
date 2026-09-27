@@ -16,8 +16,10 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const localRecs = getUserRecords(user.id);
-      const globalUsers = await getGlobalLeaderboard();
+      const [localRecs, globalUsers] = await Promise.all([
+        getUserRecords(user.id),
+        getGlobalLeaderboard(),
+      ]);
       if (cancelled) return;
       setUsers(globalUsers);
       setMyRecords(localRecs);

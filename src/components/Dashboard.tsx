@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User } from '../types';
-import { savePendingAudio, getUserRecords, getLeaderboard } from '../storage';
+import { User, AudioRecord } from '../types';
+import { savePendingAudio, getUserRecords, getGlobalLeaderboard } from '../storage';
 import Layout from './Layout';
 
 interface DashboardProps {
@@ -14,19 +14,35 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
-  const records = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [leaderboard, setLeaderboard] = useState<User[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const loadStats = async () => {
+    const [recs, lb] = await Promise.all([
+      getUserRecords(user.id),
+      getGlobalLeaderboard(),
+    ]);
+    setRecords(recs);
+    setLeaderboard(lb);
+    setStatsLoading(false);
+  };
+
+  useEffect(() => {
+    void loadStats();
+  }, [user.id]);
+
   const localWords = records.reduce((s, r) => s + r.wordCount, 0);
-  const localUsers = getLeaderboard();
-  const localRank = localUsers.findIndex((u) => u.id === user.id) + 1;
+  const localRank = leaderboard.findIndex((u) => u.id === user.id) + 1;
   const stats = {
     audios: records.length,
     words: user.totalWords || localWords,
     avg: records.length ? Math.round(localWords / records.length) : 0,
-    rank: localRank,
-    totalUsers: localUsers.length,
+    rank: localRank || 1,
+    totalUsers: leaderboard.length || 1,
   };
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('audio/')) {
       alert('Faqat audio fayl yuklang! (MP3, WAV, OGG, M4A va h.k.)');
       return;
@@ -37,27 +53,25 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      try {
-        const pending = savePendingAudio(file);
-        navigate(`/transcribe/${pending.tempId}`, { replace: true });
-      } catch (e) {
-        setLoading(false);
-        alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
-      }
-    }, 250);
+    try {
+      const pending = await savePendingAudio(file, user.id);
+      navigate(`/transcribe/${pending.tempId}`, { replace: true });
+    } catch (e) {
+      setLoading(false);
+      alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
+    }
   };
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   };
 
   const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   };
 
   return (
@@ -93,20 +107,26 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5 sm:mb-6">
         <div className="bg-white rounded-xl p-4 sm:p-5 shadow-md">
           <div className="text-xs sm:text-sm text-gray-500">Jami so'zlar</div>
-          <div className="mt-1 text-2xl sm:text-3xl font-bold text-blue-700">{stats.words}</div>
+          <div className="mt-1 text-2xl sm:text-3xl font-bold text-blue-700">
+            {statsLoading ? '…' : stats.words}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-4 sm:p-5 shadow-md">
           <div className="text-xs sm:text-sm text-gray-500">Audiodan</div>
-          <div className="mt-1 text-2xl sm:text-3xl font-bold text-emerald-600">{stats.audios}</div>
+          <div className="mt-1 text-2xl sm:text-3xl font-bold text-emerald-600">
+            {statsLoading ? '…' : stats.audios}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-4 sm:p-5 shadow-md">
           <div className="text-xs sm:text-sm text-gray-500">O'rtacha</div>
-          <div className="mt-1 text-2xl sm:text-3xl font-bold text-amber-600">{stats.avg}</div>
+          <div className="mt-1 text-2xl sm:text-3xl font-bold text-amber-600">
+            {statsLoading ? '…' : stats.avg}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-4 sm:p-5 shadow-md">
           <div className="text-xs sm:text-sm text-gray-500">Reyting</div>
           <div className="mt-1 text-2xl sm:text-3xl font-bold text-purple-700">
-            #{stats.rank}
+            #{statsLoading ? '…' : stats.rank}
           </div>
         </div>
       </div>
@@ -211,7 +231,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-bold text-emerald-600">
-              {stats.audios} ta
+              {statsLoading ? '…' : `${stats.audios} ta`}
             </div>
             <div className="mt-2 text-sm text-blue-600 font-semibold">
               Ko'rish →
@@ -232,7 +252,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             </div>
             <div className="text-2xl sm:text-3xl font-bold text-amber-600">
-              #{stats.rank} / {stats.totalUsers}
+              #{statsLoading ? '…' : `${stats.rank} / ${stats.totalUsers}`}
             </div>
             <div className="mt-2 text-sm text-blue-600 font-semibold">
               Reytingni ko'rish →
