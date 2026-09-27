@@ -7,10 +7,11 @@ const UserSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   totalWords: { type: Number, default: 0 },
   joinedAt: { type: Date, default: Date.now },
+  localIds: { type: [String], default: [], index: true },
 });
 
 const AudioRecordSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  userId: { type: String, required: true, index: true },
   audioName: { type: String, required: true, trim: true },
   transcript: { type: String, default: '' },
   wordCount: { type: Number, default: 0 },
@@ -25,7 +26,7 @@ AudioRecordSchema.index({ userId: 1, lastEditedAt: -1 });
 
 const PendingAudioSchema = new mongoose.Schema({
   tempId: { type: String, required: true, unique: true, index: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userId: { type: mongoose.Schema.Types.Mixed },
   name: { type: String, required: true },
   size: { type: Number, required: true },
   type: { type: String, required: true },
@@ -36,7 +37,7 @@ const PendingAudioSchema = new mongoose.Schema({
 });
 
 const TelegramModalSeenSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  userId: { type: mongoose.Schema.Types.Mixed, required: true, unique: true },
   seen: { type: Boolean, default: true },
 });
 

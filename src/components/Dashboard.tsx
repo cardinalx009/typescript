@@ -58,14 +58,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       alert(`Audio fayl hajmi ${maxMB} MB dan oshmasligi kerak.`);
       return;
     }
-    setLoading(true);
-    try {
-      const pending = await savePendingAudio(file, user.id);
-      navigate(`/transcribe/${pending.tempId}`, { replace: true });
-    } catch (e) {
-      setLoading(false);
-      alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
-    }
+    const pending = await savePendingAudio(file, user.id);
+    navigate(`/transcribe/${pending.tempId}`, { replace: true });
   };
 
   const onDrop = (e: React.DragEvent) => {

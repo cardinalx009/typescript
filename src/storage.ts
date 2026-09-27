@@ -154,16 +154,40 @@ const refreshGlobalLeaderboardCache = async () => {
   }
 };
 
+const findLocalUserByEmail = (email: string): User | undefined => {
+  return getUsers().find((u) => u.email.toLowerCase() === email.toLowerCase());
+};
+
+const migrateLocalRecordsToUserId = (oldUserId: string, newUserId: string) => {
+  const raw = getRecordsRaw();
+  let changed = false;
+  for (const r of raw) {
+    if (r.userId === oldUserId) {
+      r.userId = newUserId;
+      changed = true;
+    }
+  }
+  if (changed) saveRecordsRaw(raw);
+  const curr = getCurrentUser();
+  if (curr && curr.id === oldUserId) {
+    setCurrentUser({ ...curr, id: newUserId });
+  }
+  return changed;
+};
+
 export const registerUser = async (
   firstName: string,
   lastName: string,
   email: string,
   password: string
 ): Promise<AuthResult> => {
-  const api = await apiCall('/api/auth/register', 'POST', { firstName, lastName, email, password });
+  const existingLocal = findLocalUserByEmail(email);
+  const localUserId = existingLocal?.id?.startsWith('u_') ? existingLocal.id : undefined;
+  const api = await apiCall('/api/auth/register', 'POST', { firstName, lastName, email, password, localUserId });
   if (api.ok && api.data?.user) {
+    const serverId = api.data.user.id;
     const u: User = {
-      id: api.data.user.id,
+      id: serverId,
       firstName: api.data.user.firstName,
       lastName: api.data.user.lastName,
       email: api.data.user.email,
@@ -171,6 +195,13 @@ export const registerUser = async (
       totalWords: typeof api.data.user.totalWords === 'number' ? api.data.user.totalWords : 0,
       joinedAt: api.data.user.joinedAt || new Date().toISOString(),
     };
+    if (localUserId && localUserId !== serverId) {
+      try { migrateLocalRecordsToUserId(localUserId, serverId); } catch { /* ignore */ }
+      try {
+        const us = getUsers().filter((x) => x.id !== localUserId);
+        saveUsers(us);
+      } catch { /* ignore */ }
+    }
     upsertLocalUser(u);
     setCurrentUser(u);
     void refreshGlobalLeaderboardCache();
@@ -200,10 +231,13 @@ export const registerUser = async (
 };
 
 export const loginUser = async (email: string, password: string): Promise<AuthResult> => {
-  const api = await apiCall('/api/auth/login', 'POST', { email, password });
+  const existingLocal = findLocalUserByEmail(email);
+  const localUserId = existingLocal?.id?.startsWith('u_') ? existingLocal.id : undefined;
+  const api = await apiCall('/api/auth/login', 'POST', { email, password, localUserId });
   if (api.ok && api.data?.user) {
+    const serverId = api.data.user.id;
     const u: User = {
-      id: api.data.user.id,
+      id: serverId,
       firstName: api.data.user.firstName,
       lastName: api.data.user.lastName,
       email: api.data.user.email,
@@ -211,6 +245,13 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
       totalWords: typeof api.data.user.totalWords === 'number' ? api.data.user.totalWords : 0,
       joinedAt: api.data.user.joinedAt || new Date().toISOString(),
     };
+    if (localUserId && localUserId !== serverId) {
+      try { migrateLocalRecordsToUserId(localUserId, serverId); } catch { /* ignore */ }
+      try {
+        const us = getUsers().filter((x) => x.id !== localUserId);
+        saveUsers(us);
+      } catch { /* ignore */ }
+    }
     upsertLocalUser(u);
     setCurrentUser(u);
     void refreshGlobalLeaderboardCache();
@@ -267,40 +308,6 @@ export const savePendingAudio = async (
   file: File,
   userId?: string
 ): Promise<PendingAudioData & { url: string }> => {
-  let uploaded: (PendingAudioData & { url: string; createdAt: any }) | null = null;
-  try {
-    const form = new FormData();
-    form.append('audio', file);
-    if (userId) form.append('userId', userId);
-    const resp = await apiCall('/api/upload/audio', 'POST', form);
-    if (resp.ok && resp.data?.data) {
-      const d = resp.data.data;
-      const ca = d.createdAt ? new Date(d.createdAt).getTime() : Date.now();
-      const pending: PendingAudioData & { url: string } = {
-        tempId: d.tempId,
-        name: d.name || file.name,
-        size: typeof d.size === 'number' ? d.size : file.size,
-        createdAt: ca,
-        url: d.url || `/api/audio/${d.tempId}`,
-        recordId: d.recordId,
-      };
-      const bucket = getPendingBucket();
-      bucket[pending.tempId] = {
-        tempId: pending.tempId,
-        name: pending.name,
-        size: pending.size,
-        createdAt: pending.createdAt,
-        recordId: pending.recordId,
-      };
-      savePendingBucket(bucket);
-      uploaded = pending;
-    }
-  } catch {
-    uploaded = null;
-  }
-
-  if (uploaded) return uploaded;
-
   const url = URL.createObjectURL(file);
   const tempId = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   const pending: PendingAudioData = {
@@ -315,6 +322,32 @@ export const savePendingAudio = async (
   const urls = getSessionUrlBucket();
   urls[tempId] = url;
   saveSessionUrlBucket(urls);
+
+  void (async () => {
+    try {
+      const form = new FormData();
+      form.append('audio', file);
+      form.append('tempId', tempId);
+      if (userId) form.append('userId', userId);
+      const resp = await apiCall('/api/upload/audio', 'POST', form, undefined, true);
+      if (resp.ok && resp.data?.data) {
+        const d = resp.data.data;
+        const bucket2 = getPendingBucket();
+        if (bucket2[tempId]) {
+          bucket2[tempId].recordId = d.recordId || bucket2[tempId].recordId;
+          savePendingBucket(bucket2);
+        }
+        const urls2 = getSessionUrlBucket();
+        if (urls2[tempId]) {
+          urls2[tempId] = d.url || `/api/audio/${d.tempId}`;
+          saveSessionUrlBucket(urls2);
+        }
+      }
+    } catch {
+      /* ignore - local fallback is already returned */
+    }
+  })();
+
   return { ...pending, url };
 };
 
