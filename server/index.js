@@ -318,19 +318,26 @@ app.patch('/api/users/:userId', async (req, res) => {
 
 app.get('/api/leaderboard', async (_req, res) => {
   try {
-    const users = await User.find().sort({ totalWords: -1 }).limit(200).lean();
-    res.json({
-      ok: true,
-      users: users.map((u) => ({
-        id: u._id.toString(),
-        firstName: u.firstName,
-        lastName: u.lastName,
-        email: u.email,
-        totalWords: u.totalWords,
-        joinedAt: u.joinedAt.toISOString(),
-      })),
-    });
+    const totalCount = await User.countDocuments({});
+    const users = await User.find()
+      .sort({ totalWords: -1 })
+      .limit(200)
+      .lean();
+    const mapped = users.map((u) => ({
+      id: u._id.toString(),
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      totalWords: u.totalWords,
+      joinedAt: u.joinedAt.toISOString(),
+    }));
+    console.log(`[LEADERBOARD] total users in DB: ${totalCount}, returning top ${mapped.length}`);
+    if (mapped.length) {
+      console.log('[LEADERBOARD] top 3:', mapped.slice(0, 3).map((u) => `${u.id.slice(-6)} ${u.firstName} ${u.lastName} w=${u.totalWords}`));
+    }
+    res.json({ ok: true, users: mapped });
   } catch (e) {
+    console.error('[LEADERBOARD] error:', e);
     res.status(500).json({ ok: false });
   }
 });

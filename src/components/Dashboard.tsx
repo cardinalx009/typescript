@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
 import { savePendingAudio, getUserRecords, getGlobalLeaderboard } from '../storage';
@@ -18,27 +18,33 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [leaderboard, setLeaderboard] = useState<User[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  const loadStats = async () => {
-    const [recs, lb] = await Promise.all([
-      getUserRecords(user.id),
-      getGlobalLeaderboard(),
-    ]);
-    setRecords(recs);
-    setLeaderboard(lb);
-    setStatsLoading(false);
-  };
+  const loadStats = useCallback(async (force = false) => {
+    setStatsLoading(true);
+    try {
+      const [recs, lb] = await Promise.all([
+        getUserRecords(user.id),
+        getGlobalLeaderboard(force),
+      ]);
+      setRecords(recs);
+      setLeaderboard(lb);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [user.id]);
 
   useEffect(() => {
     void loadStats();
-  }, [user.id]);
+  }, [loadStats]);
 
   const localWords = records.reduce((s, r) => s + r.wordCount, 0);
-  const localRank = leaderboard.findIndex((u) => u.id === user.id) + 1;
+  const rank = leaderboard.findIndex((u) => u.id === user.id) + 1;
+  const userInLb = leaderboard.find((u) => u.id === user.id);
+  const globalWords = userInLb ? userInLb.totalWords : user.totalWords;
   const stats = {
     audios: records.length,
-    words: user.totalWords || localWords,
+    words: globalWords || localWords || 0,
     avg: records.length ? Math.round(localWords / records.length) : 0,
-    rank: localRank || 1,
+    rank: rank || 1,
     totalUsers: leaderboard.length || 1,
   };
 

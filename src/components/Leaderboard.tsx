@@ -12,20 +12,30 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [myRecords, setMyRecords] = useState<AudioRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [apiFailed, setApiFailed] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const loadAll = async (force = false) => {
+    if (force) setRefreshing(true);
+    else setLoading(true);
+    try {
       const [localRecs, globalUsers] = await Promise.all([
         getUserRecords(user.id),
-        getGlobalLeaderboard(),
+        getGlobalLeaderboard(force),
       ]);
-      if (cancelled) return;
       setUsers(globalUsers);
       setMyRecords(localRecs);
+      const onlyLocal = globalUsers.length <= 1 || (globalUsers.length === 1 && globalUsers[0].id === user.id);
+      setApiFailed(onlyLocal && force);
+    } finally {
       setLoading(false);
-    })();
-    return () => { cancelled = true; };
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
   const myRank = useMemo(() => users.findIndex((u) => u.id === user.id) + 1, [users, user.id]);
@@ -146,16 +156,61 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
           <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <span>📋</span> Barcha o'quvchilar ({users.length})
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  apiFailed
+                    ? 'bg-red-100 text-red-700 border border-red-200'
+                    : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                }`}
+              >
+                {apiFailed ? '⚠️ LOCAL' : '🌐 GLOBAL (MongoDB)'}
+              </span>
             </h3>
-            <a
-              href="https://t.me/asadbekposts"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 px-4 py-2 rounded-lg font-medium transition-all"
-            >
-              ✈️ King School Learning Center Telegram
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadAll(true)}
+                disabled={refreshing || loading}
+                className="inline-flex items-center gap-1.5 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 px-3.5 py-2 rounded-lg font-medium transition-all disabled:opacity-50"
+              >
+                {refreshing ? (
+                  <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-blue-500 border-r-2 border-transparent"></span>
+                ) : (
+                  <span>🔄</span>
+                )}
+                {refreshing ? 'Yangilanmoqda…' : 'Qayta yuklash'}
+              </button>
+              <a
+                href="https://t.me/asadbekposts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm bg-sky-50 text-sky-700 hover:bg-sky-100 px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                ✈️ Telegram
+              </a>
+            </div>
           </div>
+
+          {apiFailed && (
+            <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <span className="text-lg flex-shrink-0">⚠️</span>
+                <div className="text-xs sm:text-sm text-amber-900 flex-1">
+                  <strong>Server yoki MongoDB ulanishi ishlamayapti</strong> — hozir faqat shu qurilmadagi userlar ko'rinmoqda.{' '}
+                  <span className="opacity-80">
+                    "Qayta yuklash" ni bosing, server logida <code className="bg-white px-1 rounded">[LEADERBOARD]</code> yozuvi chiqish kerak.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadAll(true)}
+                className="text-xs sm:text-sm px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-semibold transition-all whitespace-nowrap"
+              >
+                Qayta urinish
+              </button>
+            </div>
+          )}
 
           {users.length === 0 ? (
             <div className="p-12 text-center">

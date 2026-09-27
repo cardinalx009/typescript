@@ -65,16 +65,19 @@ export type AuthResult =
   | { ok: false; error: string; user?: undefined };
 
 const API_TIMEOUT_MS = 4000;
+const API_TIMEOUT_LONG_MS = 9000;
 
 export const apiCall = async (
   path: string,
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',
   body?: unknown,
-  extra?: RequestInit
+  extra?: RequestInit,
+  longTimeout = false
 ) => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const timeout = longTimeout ? API_TIMEOUT_LONG_MS : API_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     const init: RequestInit = {
       method,
       signal: controller.signal,
@@ -119,6 +122,38 @@ const upsertLocalRecord = (r: AudioRecord) => {
   saveRecordsRaw(records);
 };
 
+const replaceLocalUsersFromGlobal = (remoteUsers: User[]) => {
+  const existingPasswords = new Map<string, string>();
+  for (const u of getUsers()) existingPasswords.set(u.id, u.passwordHash);
+  const merged: User[] = remoteUsers.map((u) => ({
+    ...u,
+    passwordHash: u.passwordHash || existingPasswords.get(u.id) || '',
+  }));
+  saveUsers(merged);
+};
+
+const refreshGlobalLeaderboardCache = async () => {
+  try {
+    const resp = await apiCall('/api/leaderboard', 'GET', undefined, undefined, true);
+    if (resp.ok && resp.data?.ok && Array.isArray(resp.data.users)) {
+      const mapped: User[] = (resp.data.users as any[])
+        .map((u: any) => ({
+          id: u.id,
+          firstName: u.firstName || '',
+          lastName: u.lastName || '',
+          email: u.email || '',
+          passwordHash: u.passwordHash || '',
+          totalWords: typeof u.totalWords === 'number' ? u.totalWords : 0,
+          joinedAt: u.createdAt || u.joinedAt || new Date().toISOString(),
+        }))
+        .sort((a: User, b: User) => (b.totalWords || 0) - (a.totalWords || 0));
+      replaceLocalUsersFromGlobal(mapped);
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
 export const registerUser = async (
   firstName: string,
   lastName: string,
@@ -138,6 +173,7 @@ export const registerUser = async (
     };
     upsertLocalUser(u);
     setCurrentUser(u);
+    void refreshGlobalLeaderboardCache();
     return { ok: true, user: u };
   }
   if (api.isBusiness) {
@@ -177,6 +213,7 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
     };
     upsertLocalUser(u);
     setCurrentUser(u);
+    void refreshGlobalLeaderboardCache();
     return { ok: true, user: u };
   }
   if (api.isBusiness) {
@@ -607,33 +644,59 @@ export const markTelegramModalSeen = async (userId: string) => {
   }
 };
 
-export const getGlobalLeaderboard = async (): Promise<User[]> => {
+const fetchGlobalLeaderboardOnce = async (timeoutMs: number): Promise<User[] | null> => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const resp = await fetch('/api/leaderboard', { signal: controller.signal });
     clearTimeout(timeoutId);
-    if (resp.ok) {
-      const data = await resp.json();
-      const list = data?.users || data;
-      if (Array.isArray(list) && list.length > 0) {
-        const mapped: User[] = list
-          .map((u) => ({
-            id: u.id,
-            firstName: u.firstName || '',
-            lastName: u.lastName || '',
-            email: u.email || '',
-            passwordHash: u.passwordHash || '',
-            totalWords: typeof u.totalWords === 'number' ? u.totalWords : 0,
-            joinedAt: u.createdAt || u.joinedAt || new Date().toISOString(),
-          }))
-          .sort((a, b) => (b.totalWords || 0) - (a.totalWords || 0));
-        for (const u of mapped) upsertLocalUser(u);
-        return mapped;
-      }
-    }
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { return null; }
+    const list = data?.users || (Array.isArray(data) ? data : null);
+    if (!Array.isArray(list)) return null;
+    const mapped: User[] = list
+      .map((u: any) => ({
+        id: u.id,
+        firstName: u.firstName || '',
+        lastName: u.lastName || '',
+        email: u.email || '',
+        passwordHash: u.passwordHash || '',
+        totalWords: typeof u.totalWords === 'number' ? u.totalWords : 0,
+        joinedAt: u.createdAt || u.joinedAt || new Date().toISOString(),
+      }))
+      .sort((a, b) => (b.totalWords || 0) - (a.totalWords || 0));
+    replaceLocalUsersFromGlobal(mapped);
+    return mapped;
   } catch {
-    /* server down -> fallback */
+    return null;
   }
-  return getLeaderboard();
+};
+
+export const getGlobalLeaderboard = async (forceRefresh = false): Promise<User[]> => {
+  const attempts = forceRefresh ? 2 : 1;
+  for (let i = 0; i < attempts; i++) {
+    const t = i === 0 ? 9000 : 6000;
+    const result = await fetchGlobalLeaderboardOnce(t);
+    if (result !== null && Array.isArray(result)) {
+      const cur = getCurrentUser();
+      if (cur && !result.some((u) => u.id === cur.id)) {
+        const merged = [...result, { ...cur }].sort(
+          (a, b) => (b.totalWords || 0) - (a.totalWords || 0)
+        );
+        replaceLocalUsersFromGlobal(merged);
+        return merged;
+      }
+      return result;
+    }
+  }
+  const cur = getCurrentUser();
+  const local = getLeaderboard();
+  if (cur && !local.some((u) => u.id === cur.id)) {
+    return [...local, { ...cur }].sort(
+      (a, b) => (b.totalWords || 0) - (a.totalWords || 0)
+    );
+  }
+  return local;
 };
