@@ -11,6 +11,7 @@ const UserSchema = new mongoose.Schema({
 });
 
 const AudioRecordSchema = new mongoose.Schema({
+  localId: { type: String, index: true, sparse: true },
   userId: { type: String, required: true, index: true },
   audioName: { type: String, required: true, trim: true },
   transcript: { type: String, default: '' },

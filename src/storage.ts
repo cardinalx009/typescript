@@ -290,6 +290,46 @@ const saveRecordsRaw = (records: AudioRecord[]) => {
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
 };
 
+const serverRecordIds = new Set<string>();
+
+const applyServerTotal = (userId: string, total: unknown) => {
+  if (typeof total !== 'number' || !Number.isFinite(total)) return;
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx >= 0) {
+    users[idx].totalWords = total;
+    saveUsers(users);
+  }
+  const cur = getCurrentUser();
+  if (cur && cur.id === userId) {
+    setCurrentUser({ ...cur, totalWords: total });
+  }
+};
+
+const pushRecordToServer = async (record: AudioRecord, force = false) => {
+  if (!force && serverRecordIds.has(record.id)) return;
+  serverRecordIds.add(record.id);
+  const payload = {
+    localId: record.id,
+    userId: record.userId,
+    audioName: record.audioName,
+    transcript: record.transcript,
+    wordCount: record.wordCount,
+    progressSeconds: record.progressSeconds,
+  };
+  let resp = force
+    ? await apiCall(`/api/records/${record.id}`, 'PATCH', payload)
+    : { ok: false, status: 0, isBusiness: false, data: null };
+  if (!resp.ok) {
+    resp = await apiCall('/api/records', 'POST', payload);
+  }
+  if (!resp.ok) {
+    serverRecordIds.delete(record.id);
+    return;
+  }
+  applyServerTotal(record.userId, resp.data?.userTotal);
+};
+
 export const getRecords = (): AudioRecord[] => {
   const now = Date.now();
   const records = getRecordsRaw();
@@ -307,7 +347,41 @@ export const getRecords = (): AudioRecord[] => {
   return records;
 };
 
+const syncUserRecords = async (userId: string) => {
+  const resp = await apiCall(`/api/users/${userId}/records`, 'GET');
+  if (!resp.ok) return;
+  const list = Array.isArray(resp.data?.records) ? resp.data.records : null;
+  if (!list) return;
+  const local = getRecordsRaw();
+  const localById = new Map(local.map((r) => [r.id, r]));
+  for (const remote of list) {
+    const localId = typeof remote.localId === 'string' ? remote.localId : remote.id;
+    const existing = localById.get(localId);
+    if (existing) {
+      if ((existing.wordCount || 0) !== (remote.wordCount || 0)) {
+        existing.wordCount = remote.wordCount || 0;
+        existing.audioName = remote.audioName || existing.audioName;
+        existing.progressSeconds = remote.progressSeconds || 0;
+      }
+      continue;
+    }
+    localById.set(localId, {
+      id: localId,
+      userId,
+      audioName: remote.audioName || 'Audio',
+      transcript: '',
+      wordCount: remote.wordCount || 0,
+      progressSeconds: remote.progressSeconds || 0,
+      createdAt: remote.createdAt,
+      expiresAt: remote.expiresAt,
+      lastEditedAt: remote.lastEditedAt || remote.createdAt,
+    });
+  }
+  saveRecordsRaw(Array.from(localById.values()));
+};
+
 export const getUserRecords = (userId: string): AudioRecord[] => {
+  void syncUserRecords(userId);
   return getRecords()
     .filter((r) => r.userId === userId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -345,6 +419,7 @@ export const addRecord = (
   saveRecordsRaw(records);
   recalcUserTotalWords(userId);
   if (tempId) linkTempIdToRecord(tempId, record.id);
+  void pushRecordToServer(record);
   const cur = getCurrentUser();
   if (cur && cur.id === userId) {
     const words = recalcUserTotalWords(userId);
@@ -374,6 +449,7 @@ export const updateRecord = (
   r.wordCount = r.transcript.trim() ? r.transcript.trim().split(/\s+/).length : 0;
   saveRecordsRaw(records);
   recalcUserTotalWords(r.userId);
+  void pushRecordToServer(r, true);
   const cur = getCurrentUser();
   if (cur && cur.id === r.userId) {
     const words = recalcUserTotalWords(r.userId);

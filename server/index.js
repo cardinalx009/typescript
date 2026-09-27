@@ -68,7 +68,11 @@ const recalcUserTotalWords = async (userIdOrLocal) => {
       { userId: { $in: possibleIds.filter((x) => x !== mongoId.toString()) } },
       { $set: { userId: mongoId.toString() } }
     );
-  } catch (e) { console.error(e); }
+    return total;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 };
 
 const simpleHashMatch = (p, h) => {
@@ -272,30 +276,44 @@ app.get('/api/pending/:tempId', async (req, res) => {
 
 const recordToJSON = (r) => ({
   id: r._id.toString(),
+  localId: r.localId || undefined,
   userId: String(r.userId),
   audioName: r.audioName,
   transcript: r.transcript,
   wordCount: r.wordCount,
   progressSeconds: r.progressSeconds,
   audioObjectKey: r.audioObjectKey || undefined,
-  createdAt: r.createdAt.toISOString(),
-  expiresAt: r.expiresAt.toISOString(),
-  lastEditedAt: r.lastEditedAt.toISOString(),
+  createdAt: new Date(r.createdAt).toISOString(),
+  expiresAt: new Date(r.expiresAt).toISOString(),
+  lastEditedAt: new Date(r.lastEditedAt).toISOString(),
 });
 
 app.post('/api/records', async (req, res) => {
   try {
-    const { userId, audioName, transcript, progressSeconds, audioObjectKey, tempId } = req.body;
+    const { id, localId, userId, audioName, transcript, wordCount, progressSeconds, audioObjectKey, tempId } = req.body;
     if (!userId || !audioName?.trim()) return res.status(400).json({ ok: false, error: 'UserId va audioName kerak' });
     const finalUserId = await normalizeUserId(userId);
-    const wordCount = transcript?.trim() ? transcript.trim().split(/\s+/).length : 0;
+    const words = typeof wordCount === 'number'
+      ? wordCount
+      : (transcript?.trim() ? transcript.trim().split(/\s+/).length : 0);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const clientLocalId = typeof localId === 'string' ? localId : (typeof id === 'string' ? id : undefined);
+
+    if (clientLocalId) {
+      const existing = await AudioRecord.findOne({ localId: clientLocalId }).catch(() => null);
+      if (existing) {
+        const updated = await recalcUserTotalWords(finalUserId);
+        return res.json({ ok: true, record: recordToJSON(existing), userTotal: typeof updated === 'number' ? updated : words });
+      }
+    }
+
     const rec = await AudioRecord.create({
+      localId: clientLocalId,
       userId: finalUserId,
       audioName: audioName.trim(),
       transcript: transcript || '',
-      wordCount,
+      wordCount: words,
       progressSeconds: progressSeconds || 0,
       audioObjectKey,
       expiresAt,
@@ -307,8 +325,8 @@ app.post('/api/records', async (req, res) => {
       await PendingAudio.updateOne({ tempId }, { recordId: rec._id.toString() }).catch(() => {});
     }
     const userObj = await findUserByAnyId(finalUserId);
-    const userTotal = userObj ? userObj.totalWords : wordCount;
-    res.json({ ok: true, record: recordToJSON(rec), userTotal: typeof userTotal === 'number' ? userTotal : wordCount });
+    const userTotal = userObj ? userObj.totalWords : words;
+    res.json({ ok: true, record: recordToJSON(rec), userTotal: typeof userTotal === 'number' ? userTotal : words });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: 'Saqlashda xato' });
@@ -340,14 +358,16 @@ app.patch('/api/records/:id', async (req, res) => {
       rec = await AudioRecord.findById(req.params.id);
     }
     if (!rec) {
-      rec = await AudioRecord.findOne({ _id: req.params.id }).catch(() => null);
+      rec = await AudioRecord.findOne({ localId: req.params.id }).catch(() => null);
     }
     if (!rec) return res.status(404).json({ ok: false });
-    const { transcript, audioName, progressSeconds } = req.body;
+    const { transcript, audioName, wordCount, progressSeconds } = req.body;
     if (transcript !== undefined) rec.transcript = transcript;
     if (audioName !== undefined) rec.audioName = audioName.trim();
     if (progressSeconds !== undefined) rec.progressSeconds = progressSeconds;
-    rec.wordCount = rec.transcript?.trim() ? rec.transcript.trim().split(/\s+/).length : 0;
+    rec.wordCount = typeof wordCount === 'number'
+      ? wordCount
+      : (rec.transcript?.trim() ? rec.transcript.trim().split(/\s+/).length : 0);
     rec.lastEditedAt = new Date();
     await rec.save();
     const finalUserId = await normalizeUserId(rec.userId);
@@ -355,8 +375,8 @@ app.patch('/api/records/:id', async (req, res) => {
       rec.userId = finalUserId;
       await rec.save();
     }
-    await recalcUserTotalWords(finalUserId);
-    res.json({ ok: true, record: recordToJSON(rec) });
+    const total = await recalcUserTotalWords(finalUserId);
+    res.json({ ok: true, record: recordToJSON(rec), userTotal: typeof total === 'number' ? total : rec.wordCount });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: 'Yangilashda xato' });
