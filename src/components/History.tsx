@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User } from '../types';
+import { User, AudioRecord } from '../types';
 import { getUserRecords, buildEditTempId } from '../storage';
 import Layout from './Layout';
 
@@ -10,8 +10,20 @@ interface HistoryProps {
 }
 
 export default function History({ user, onLogout }: HistoryProps) {
-  const records = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await getUserRecords(user.id);
+      if (cancelled) return;
+      setRecords(r);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
 
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -43,6 +55,19 @@ export default function History({ user, onLogout }: HistoryProps) {
   };
 
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
+
+  if (loading) {
+    return (
+      <Layout user={user} onLogout={onLogout}>
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-white border-r-4 border-transparent mb-4"></div>
+            <div className="text-white text-sm font-medium">Tarix yuklanmoqda…</div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout user={user} onLogout={onLogout}>

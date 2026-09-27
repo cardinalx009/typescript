@@ -1,5 +1,6 @@
-import { User } from '../types';
-import { getUserRecords, saveUsers, getUsers, setCurrentUser } from '../storage';
+import { useState, useEffect } from 'react';
+import { User, AudioRecord } from '../types';
+import { getUserRecords, saveUsers, getUsers, setCurrentUser, updateUserProfile } from '../storage';
 import Layout from './Layout';
 
 interface ProfileProps {
@@ -9,7 +10,27 @@ interface ProfileProps {
 }
 
 export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
-  const records = getUserRecords(user.id);
+  const [records, setRecords] = useState<AudioRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [firstName, setFirstName] = useState(user.firstName);
+  const [lastName, setLastName] = useState(user.lastName);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [statusMsg, setStatusMsg] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await getUserRecords(user.id);
+      if (cancelled) return;
+      setRecords(r);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
   const totalAudios = records.length;
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
 
@@ -31,17 +52,67 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
     onLogout();
   };
 
-  const handleRefreshStats = () => {
+  const handleRefreshStats = async () => {
     const users = getUsers();
     const idx = users.findIndex(u => u.id === user.id);
     if (idx !== -1) {
-      const recs = getUserRecords(user.id);
+      const recs = await getUserRecords(user.id);
       users[idx].totalWords = recs.reduce((s, r) => s + r.wordCount, 0);
       saveUsers(users);
       setCurrentUser(users[idx]);
       onUpdate(users[idx]);
     }
   };
+
+  const handleSaveProfile = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      setStatusMsg('Ism va familiya to\'ldirilishi kerak');
+      setSaveStatus('error');
+      return;
+    }
+    if (password && password !== confirmPassword) {
+      setStatusMsg('Parollar mos emas');
+      setSaveStatus('error');
+      return;
+    }
+    if (password && password.length < 4) {
+      setStatusMsg('Parol kamida 4 ta belgi bo\'lishi kerak');
+      setSaveStatus('error');
+      return;
+    }
+    setSaveStatus('saving');
+    setStatusMsg('');
+    const patch: { firstName?: string; lastName?: string; password?: string } = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+    };
+    if (password) patch.password = password;
+    const res = await updateUserProfile(user.id, patch);
+    if (!res.ok || !res.user) {
+      setSaveStatus('error');
+      setStatusMsg(res.error || 'Xatolik');
+      return;
+    }
+    onUpdate(res.user);
+    setSaveStatus('saved');
+    setStatusMsg('Saqlandi');
+    setPassword('');
+    setConfirmPassword('');
+    setTimeout(() => { setEditMode(false); setSaveStatus('idle'); setStatusMsg(''); }, 1500);
+  };
+
+  if (loading) {
+    return (
+      <Layout user={user} onLogout={onLogout}>
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-white border-r-4 border-transparent mb-4"></div>
+            <div className="text-white text-sm font-medium">Profil yuklanmoqda…</div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout user={user} onLogout={onLogout}>
@@ -61,6 +132,80 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
             </p>
 
             <div className="mt-6 space-y-3">
+              {!editMode ? (
+                <button
+                  onClick={() => {
+                    setFirstName(user.firstName);
+                    setLastName(user.lastName);
+                    setPassword('');
+                    setConfirmPassword('');
+                    setStatusMsg('');
+                    setSaveStatus('idle');
+                    setEditMode(true);
+                  }}
+                  className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-all"
+                >
+                  ✏️ Ma\'lumotlarni tahrirlash
+                </button>
+              ) : (
+                <>
+                  <div className="text-left text-sm font-medium text-gray-700">Ism</div>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  />
+                  <div className="text-left text-sm font-medium text-gray-700">Familya</div>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  />
+                  <div className="text-left text-sm font-medium text-gray-700">Yangi parol (ixtiyoriy)</div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Kamida 4 belgi"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Parolni takrorlang"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  />
+                  {statusMsg && (
+                    <div className={`text-xs px-3 py-2 rounded-lg ${
+                      saveStatus === 'error'
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : saveStatus === 'saved'
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-gray-50 text-gray-600'
+                    }`}>
+                      {statusMsg}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setEditMode(false); setSaveStatus('idle'); setStatusMsg(''); }}
+                      className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm"
+                    >
+                      Bekor qilish
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saveStatus === 'saving'}
+                      className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition-all"
+                    >
+                      {saveStatus === 'saving' ? 'Saqlanmoqda…' : 'Saqlash'}
+                    </button>
+                  </div>
+                </>
+              )}
               <button
                 onClick={handleRefreshStats}
                 className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-all"

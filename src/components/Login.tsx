@@ -23,7 +23,7 @@ export default function Login({ onAuth }: LoginProps) {
 
   const resetErr = () => setError('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErr();
 
@@ -34,49 +34,41 @@ export default function Login({ onAuth }: LoginProps) {
     if (!emailRegex.test(email)) return setError('To\'g\'ri email kiriting');
 
     setLoading(true);
-    setTimeout(() => {
-      try {
-        if (tab === 'register') {
-          if (!firstName.trim() || !lastName.trim()) {
-            setLoading(false);
-            return setError('Ism va familyani kiriting');
-          }
-          if (password.length < 4) {
-            setLoading(false);
-            return setError('Parol kamida 4 ta belgi bo\'lsin');
-          }
-          if (password !== confirmPassword) {
-            setLoading(false);
-            return setError('Parollar mos emas');
-          }
-          const existedEmail = getUsers().some(
-            (u) => u.email.toLowerCase() === email.toLowerCase()
-          );
-          if (existedEmail) {
-            setLoading(false);
-            setTab('login');
-            return setError('Bu email mavjud. Pastdan Login qismiga o\'tdingiz, parol bilan kiring.');
-          }
-          const res = registerUser(firstName, lastName, email, password);
-          if (!res.ok || !res.user) {
-            setLoading(false);
-            return setError(res.error || 'Xatolik');
-          }
-          onAuth(res.user, true);
-        } else {
-          const res = loginUser(email, password);
-          if (!res.ok || !res.user) {
-            setLoading(false);
-            return setError(res.error || 'Xatolik');
-          }
-          onAuth(res.user, false);
+    try {
+      if (tab === 'register') {
+        if (!firstName.trim() || !lastName.trim()) {
+          return setError('Ism va familyani kiriting');
         }
-      } catch (err) {
-        setError('Xatolik yuz berdi');
-      } finally {
-        setLoading(false);
+        if (password.length < 4) {
+          return setError('Parol kamida 4 ta belgi bo\'lsin');
+        }
+        if (password !== confirmPassword) {
+          return setError('Parollar mos emas');
+        }
+        const existedEmail = getUsers().some(
+          (u) => u.email.toLowerCase() === email.toLowerCase()
+        );
+        if (existedEmail) {
+          setTab('login');
+          return setError('Bu email mavjud. Pastdan Login qismiga o\'tdingiz, parol bilan kiring.');
+        }
+        const res = await registerUser(firstName, lastName, email, password);
+        if (!res.ok || !res.user) {
+          return setError(res.error || 'Xatolik');
+        }
+        onAuth(res.user, true);
+      } else {
+        const res = await loginUser(email, password);
+        if (!res.ok || !res.user) {
+          return setError(res.error || 'Xatolik');
+        }
+        onAuth(res.user, false);
       }
-    }, 400);
+    } catch (err) {
+      setError('Xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

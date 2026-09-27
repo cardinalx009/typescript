@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { User } from '../types';
 import { getLeaderboard, getUserRecords } from '../storage';
 import Layout from './Layout';
@@ -9,9 +9,23 @@ interface LeaderboardProps {
 }
 
 export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
-  const users = useMemo(() => getLeaderboard(), [user]);
-  const myRecords = getUserRecords(user.id);
-  const myRank = users.findIndex((u) => u.id === user.id) + 1;
+  const [users, setUsers] = useState<User[]>([]);
+  const [myRecords, setMyRecords] = useState<Awaited<ReturnType<typeof getUserRecords>>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [u, recs] = await Promise.all([getLeaderboard(), getUserRecords(user.id)]);
+      if (cancelled) return;
+      setUsers(u);
+      setMyRecords(recs);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user.id]);
+
+  const myRank = useMemo(() => users.findIndex((u) => u.id === user.id) + 1, [users, user.id]);
   const myAudioCount = myRecords.length;
 
   const getMedal = (rank: number) => {
@@ -31,6 +45,19 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
 
   const top3 = users.slice(0, 3);
   const others = users.slice(3);
+
+  if (loading) {
+    return (
+      <Layout user={user} onLogout={onLogout}>
+        <div className="flex items-center justify-center py-24">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-white border-r-4 border-transparent mb-4"></div>
+            <div className="text-white text-sm font-medium">Leaderboard yuklanmoqda…</div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout user={user} onLogout={onLogout}>

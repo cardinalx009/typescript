@@ -17,20 +17,25 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [stats, setStats] = useState({ audios: 0, words: 0, avg: 0, rank: 0, totalUsers: 0 });
 
   useEffect(() => {
-    const records = getUserRecords(user.id);
-    const words = records.reduce((s, r) => s + r.wordCount, 0);
-    const users = getLeaderboard();
-    const rank = users.findIndex((u) => u.id === user.id) + 1;
-    setStats({
-      audios: records.length,
-      words: user.totalWords || words,
-      avg: records.length ? Math.round(words / records.length) : 0,
-      rank,
-      totalUsers: users.length,
-    });
+    let cancelled = false;
+    (async () => {
+      const records = await getUserRecords(user.id);
+      const words = records.reduce((s, r) => s + r.wordCount, 0);
+      const users = await getLeaderboard();
+      const rank = users.findIndex((u) => u.id === user.id) + 1;
+      if (cancelled) return;
+      setStats({
+        audios: records.length,
+        words: user.totalWords || words,
+        avg: records.length ? Math.round(words / records.length) : 0,
+        rank,
+        totalUsers: users.length,
+      });
+    })();
+    return () => { cancelled = true; };
   }, [user.id, user.totalWords]);
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('audio/')) {
       alert('Faqat audio fayl yuklang! (MP3, WAV, OGG, M4A va h.k.)');
       return;
@@ -41,27 +46,26 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      try {
-        const pending = savePendingAudio(file);
-        navigate(`/transcribe/${pending.tempId}`, { replace: true });
-      } catch (e) {
-        setLoading(false);
-        alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
-      }
-    }, 250);
+    try {
+      await new Promise((r) => setTimeout(r, 250));
+      const pending = await savePendingAudio(file);
+      navigate(`/transcribe/${pending.tempId}`, { replace: true });
+    } catch (e) {
+      setLoading(false);
+      alert('Faylni yuklashda xatolik. Boshqattan urinib ko\'ring.');
+    }
   };
 
-  const onDrop = (e: React.DragEvent) => {
+  const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
+    if (file) await handleFile(file);
   };
 
-  const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    if (file) await handleFile(file);
   };
 
   return (

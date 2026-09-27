@@ -296,6 +296,38 @@ app.get('/api/leaderboard', async (_req, res) => {
   }
 });
 
+app.patch('/api/users/:userId', async (req, res) => {
+  try {
+    const { firstName, lastName, password } = req.body;
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ ok: false, error: 'Foydalanuvchi topilmadi' });
+    if (firstName?.trim()) user.firstName = firstName.trim();
+    if (lastName?.trim()) user.lastName = lastName.trim();
+    if (password && password.length >= 4) {
+      const salt = bcrypt.genSaltSync(10);
+      user.passwordHash = bcrypt.hashSync(password, salt);
+    } else if (password && password.length < 4) {
+      return res.status(400).json({ ok: false, error: 'Parol kamida 4 ta belgi bo\'lishi kerak' });
+    }
+    await user.save();
+    res.json({
+      ok: true,
+      user: {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        totalWords: user.totalWords,
+        joinedAt: user.joinedAt.toISOString(),
+        passwordHash: user.passwordHash,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
 app.get('/api/telegram/seen/:userId', async (req, res) => {
   try {
     const doc = await TelegramModalSeen.findOne({ userId: req.params.userId }).lean();
