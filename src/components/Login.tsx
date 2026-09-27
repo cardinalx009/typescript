@@ -23,7 +23,7 @@ export default function Login({ onAuth }: LoginProps) {
 
   const resetErr = () => setError('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErr();
 
@@ -34,7 +34,7 @@ export default function Login({ onAuth }: LoginProps) {
     if (!emailRegex.test(email)) return setError('To\'g\'ri email kiriting');
 
     setLoading(true);
-    setTimeout(() => {
+    try {
       if (tab === 'register') {
         if (!firstName.trim() || !lastName.trim()) {
           setLoading(false);
@@ -56,7 +56,7 @@ export default function Login({ onAuth }: LoginProps) {
           setLoading(false);
           return setError('Bu email mavjud. Pastdan Login qismiga o\'tdingiz, parol bilan kiring.');
         }
-        const res = registerUser(firstName, lastName, email, password);
+        const res = await registerUser(firstName, lastName, email, password);
         if (!res.ok || !res.user) {
           setLoading(false);
           return setError(res.error || 'Xatolik');
@@ -64,7 +64,7 @@ export default function Login({ onAuth }: LoginProps) {
         setLoading(false);
         onAuth(res.user, true);
       } else {
-        const res = loginUser(email, password);
+        const res = await loginUser(email, password);
         if (!res.ok || !res.user) {
           setLoading(false);
           return setError(res.error || 'Xatolik');
@@ -72,7 +72,10 @@ export default function Login({ onAuth }: LoginProps) {
         setLoading(false);
         onAuth(res.user, false);
       }
-    }, 400);
+    } catch {
+      setLoading(false);
+      setError('Xatolik yuz berdi');
+    }
   };
 
   return (

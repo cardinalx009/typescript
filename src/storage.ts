@@ -64,12 +64,66 @@ export type AuthResult =
   | { ok: true; user: User }
   | { ok: false; error: string; user?: undefined };
 
-export const registerUser = (
+const API_TIMEOUT_MS = 4000;
+
+const fetchJson = async (path: string, body: unknown) => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const resp = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    let data: any = null;
+    try { data = await resp.json(); } catch { data = null; }
+    const isBusiness = resp.status >= 400 && resp.status < 500;
+    return {
+      ok: resp.ok && data?.ok !== false,
+      status: resp.status,
+      isBusiness,
+      data,
+    };
+  } catch {
+    return { ok: false, status: 0, isBusiness: false, data: null };
+  }
+};
+
+const upsertLocalUser = (u: User) => {
+  const users = getUsers();
+  const idx = users.findIndex((x) => x.id === u.id || x.email.toLowerCase() === u.email.toLowerCase());
+  if (idx >= 0) users[idx] = { ...users[idx], ...u };
+  else users.push(u);
+  saveUsers(users);
+};
+
+export const registerUser = async (
   firstName: string,
   lastName: string,
   email: string,
   password: string
-): AuthResult => {
+): Promise<AuthResult> => {
+  const api = await fetchJson('/api/auth/register', { firstName, lastName, email, password });
+  if (api.ok && api.data?.user) {
+    const u: User = {
+      id: api.data.user.id,
+      firstName: api.data.user.firstName,
+      lastName: api.data.user.lastName,
+      email: api.data.user.email,
+      passwordHash: api.data.user.passwordHash || passwordHash(password),
+      totalWords: typeof api.data.user.totalWords === 'number' ? api.data.user.totalWords : 0,
+      joinedAt: api.data.user.joinedAt || new Date().toISOString(),
+    };
+    upsertLocalUser(u);
+    setCurrentUser(u);
+    return { ok: true, user: u };
+  }
+  if (api.isBusiness) {
+    return { ok: false, error: api.data?.error || 'Xatolik' };
+  }
+
   const users = getUsers();
   if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
     return { ok: false, error: 'Bu email allaqachon mavjud' };
@@ -89,7 +143,26 @@ export const registerUser = (
   return { ok: true, user };
 };
 
-export const loginUser = (email: string, password: string): AuthResult => {
+export const loginUser = async (email: string, password: string): Promise<AuthResult> => {
+  const api = await fetchJson('/api/auth/login', { email, password });
+  if (api.ok && api.data?.user) {
+    const u: User = {
+      id: api.data.user.id,
+      firstName: api.data.user.firstName,
+      lastName: api.data.user.lastName,
+      email: api.data.user.email,
+      passwordHash: api.data.user.passwordHash || passwordHash(password),
+      totalWords: typeof api.data.user.totalWords === 'number' ? api.data.user.totalWords : 0,
+      joinedAt: api.data.user.joinedAt || new Date().toISOString(),
+    };
+    upsertLocalUser(u);
+    setCurrentUser(u);
+    return { ok: true, user: u };
+  }
+  if (api.isBusiness) {
+    return { ok: false, error: api.data?.error || 'Xatolik' };
+  }
+
   const users = getUsers();
   const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
   if (!user) {
