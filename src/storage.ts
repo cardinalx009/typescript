@@ -68,7 +68,7 @@ const API_TIMEOUT_MS = 4000;
 
 export const apiCall = async (
   path: string,
-  method: 'GET' | 'POST' | 'PATCH' | 'PUT' = 'POST',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',
   body?: unknown
 ) => {
   try {
@@ -429,6 +429,32 @@ export const updateRecord = (
     }
   }
   return r;
+};
+
+export const deleteRecord = (id: string): boolean => {
+  const records = getRecordsRaw();
+  const idx = records.findIndex((r) => r.id === id);
+  if (idx < 0) return false;
+  const removed = records.splice(idx, 1)[0];
+  saveRecordsRaw(records);
+  serverRecordIds.delete(id);
+  recalcUserTotalWords(removed.userId);
+  const cur = getCurrentUser();
+  if (cur && cur.id === removed.userId) {
+    const words = recalcUserTotalWords(removed.userId);
+    const updated = { ...cur, totalWords: words };
+    setCurrentUser(updated);
+    const users = getUsers();
+    const ui = users.findIndex((u) => u.id === removed.userId);
+    if (ui >= 0) {
+      users[ui] = updated;
+      saveUsers(users);
+    }
+  }
+  void apiCall(`/api/records/${id}`, 'DELETE').then((resp) => {
+    if (resp.ok) applyServerTotal(removed.userId, resp.data?.userTotal);
+  });
+  return true;
 };
 
 export const getLeaderboard = (): User[] => {

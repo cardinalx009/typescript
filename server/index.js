@@ -383,6 +383,26 @@ app.patch('/api/records/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/records/:id', async (req, res) => {
+  try {
+    let rec = null;
+    if (isValidObjectId(req.params.id) && req.params.id.length === 24) {
+      rec = await AudioRecord.findById(req.params.id);
+    }
+    if (!rec) {
+      rec = await AudioRecord.findOne({ localId: req.params.id }).catch(() => null);
+    }
+    if (!rec) return res.status(404).json({ ok: false });
+    const finalUserId = await normalizeUserId(rec.userId);
+    await AudioRecord.deleteOne({ _id: rec._id });
+    const total = await recalcUserTotalWords(finalUserId);
+    res.json({ ok: true, userTotal: typeof total === 'number' ? total : 0 });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'O\'chirishda xato' });
+  }
+});
+
 app.get('/api/users/:userId/records', async (req, res) => {
   try {
     const now = new Date();

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
-import { getUserRecords, buildEditTempId } from '../storage';
+import { getUserRecords, deleteRecord, buildEditTempId } from '../storage';
 import Layout from './Layout';
 
 interface HistoryProps {
@@ -13,12 +13,21 @@ export default function History({ user, onLogout }: HistoryProps) {
   const [records, setRecords] = useState<AudioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<AudioRecord | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setRecords(getUserRecords(user.id));
     setLoading(false);
   }, [user.id]);
+
+  const handleDelete = (record: AudioRecord) => {
+    if (deleteRecord(record.id)) {
+      setRecords(getUserRecords(user.id));
+      if (selected === record.id) setSelected(null);
+    }
+    setConfirming(null);
+  };
 
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -163,8 +172,18 @@ export default function History({ user, onLogout }: HistoryProps) {
                               : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white shadow-md'
                           }`}
                         >
-                          {expired ? 'Muddati o\'tgan' : 'Davom etish →'}
+                          {expired ? 'Muddati o\'tgan' : 'Davom etirish →'}
                         </Link>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirming(r);
+                          }}
+                          className="px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-all"
+                        >
+                          🗑 O'chirish
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -190,6 +209,43 @@ export default function History({ user, onLogout }: HistoryProps) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {confirming && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setConfirming(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-4xl mb-3">🗑</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                O'chirilsinmi?
+              </h3>
+              <p className="text-gray-600 text-sm mb-6">
+                <span className="font-semibold">{confirming.audioName}</span> yozuvi
+                butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirming(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(confirming)}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-red-600 text-white hover:bg-red-700 shadow-lg transition-all"
+                >
+                  O'chirish
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
