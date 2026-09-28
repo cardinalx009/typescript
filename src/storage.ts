@@ -343,45 +343,26 @@ export const getRecords = (): AudioRecord[] => {
       }
     }
   }
+  const bestByKey = new Map<string, AudioRecord>();
+  for (const r of records) {
+    const key = `${r.userId}|${r.audioName}|${r.createdAt}`;
+    const kept = bestByKey.get(key);
+    if (!kept) {
+      bestByKey.set(key, r);
+    } else if (!kept.transcript && r.transcript) {
+      bestByKey.set(key, r);
+      records.splice(records.indexOf(kept), 1);
+      changed = true;
+    } else {
+      records.splice(records.indexOf(r), 1);
+      changed = true;
+    }
+  }
   if (changed) saveRecordsRaw(records);
   return records;
 };
 
-const syncUserRecords = async (userId: string) => {
-  const resp = await apiCall(`/api/users/${userId}/records`, 'GET');
-  if (!resp.ok) return;
-  const list = Array.isArray(resp.data?.records) ? resp.data.records : null;
-  if (!list) return;
-  const local = getRecordsRaw();
-  const localById = new Map(local.map((r) => [r.id, r]));
-  for (const remote of list) {
-    const localId = typeof remote.localId === 'string' ? remote.localId : remote.id;
-    const existing = localById.get(localId);
-    if (existing) {
-      if ((existing.wordCount || 0) !== (remote.wordCount || 0)) {
-        existing.wordCount = remote.wordCount || 0;
-        existing.audioName = remote.audioName || existing.audioName;
-        existing.progressSeconds = remote.progressSeconds || 0;
-      }
-      continue;
-    }
-    localById.set(localId, {
-      id: localId,
-      userId,
-      audioName: remote.audioName || 'Audio',
-      transcript: '',
-      wordCount: remote.wordCount || 0,
-      progressSeconds: remote.progressSeconds || 0,
-      createdAt: remote.createdAt,
-      expiresAt: remote.expiresAt,
-      lastEditedAt: remote.lastEditedAt || remote.createdAt,
-    });
-  }
-  saveRecordsRaw(Array.from(localById.values()));
-};
-
 export const getUserRecords = (userId: string): AudioRecord[] => {
-  void syncUserRecords(userId);
   return getRecords()
     .filter((r) => r.userId === userId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
