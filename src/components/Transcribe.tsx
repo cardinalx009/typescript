@@ -12,6 +12,7 @@ import {
   buildEditTempId,
   PendingAudioData,
 } from '../storage';
+import { typingPath } from '../sitePaths';
 
 interface TranscribeProps {
   user: User;
@@ -150,7 +151,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
   useEffect(() => {
     if (initialLoading) return;
     if (!initial) {
-      const timer = setTimeout(() => navigate('/', { replace: true }), 4000);
+      const timer = setTimeout(() => navigate(typingPath(), { replace: true }), 4000);
       return () => clearTimeout(timer);
     }
   }, [initial, initialLoading, navigate]);
@@ -289,7 +290,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
             Audio muddati tugagan yoki noto'g'ri havola. Iltimos qaytadan yuklang.
           </p>
           <Link
-            to="/"
+            to={typingPath()}
             className="inline-block px-5 py-2.5 bg-gradient-to-r from-blue-600 to-sky-500 text-white rounded-lg font-semibold shadow-md"
           >
             Asosiyga qaytish
@@ -467,7 +468,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       }
     }
     if (initial.pending && tempId) clearPendingAudio(tempId);
-    navigate('/history', { replace: true });
+    navigate(typingPath('/history'), { replace: true });
   };
 
   return (
@@ -475,7 +476,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       <nav className="sticky top-0 z-30 bg-white/10 backdrop-blur-md border-b border-white/20 shadow-lg">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
-            <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Link to={typingPath()} className="flex items-center gap-2 min-w-0">
               <img
                 src="/photo_2025-01-04_19-28-41.jpg"
                 alt="King School Learning Center logo"
@@ -550,7 +551,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
               </div>
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <Link
-                  to="/"
+                  to={typingPath()}
                   className="order-2 sm:order-1 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-center transition-all text-sm"
                 >
                   ← Ortga
@@ -838,7 +839,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
 
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                       <Link
-                        to="/"
+                        to={typingPath()}
                         className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold text-sm text-center transition-all"
                       >
                         ← Boshiga

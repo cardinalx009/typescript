@@ -188,6 +188,25 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
   return { ok: true, user };
 };
 
+export const googleLogin = async (credential: string): Promise<AuthResult> => {
+  const api = await apiCall('/api/auth/google', 'POST', { credential });
+  if (api.ok && api.data?.user) {
+    const u: User = {
+      id: api.data.user.id,
+      firstName: api.data.user.firstName,
+      lastName: api.data.user.lastName,
+      email: api.data.user.email,
+      passwordHash: api.data.user.passwordHash || 'google',
+      totalWords: typeof api.data.user.totalWords === 'number' ? api.data.user.totalWords : 0,
+      joinedAt: api.data.user.joinedAt || new Date().toISOString(),
+    };
+    upsertLocalUser(u);
+    setCurrentUser(u);
+    return { ok: true, user: u };
+  }
+  return { ok: false, error: api.data?.error || 'Google bilan kirishda xatolik' };
+};
+
 export interface PendingAudioData {
   tempId: string;
   name: string;

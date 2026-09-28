@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import { User, AudioRecord, PendingAudio, TelegramModalSeen } from './models.js';
+import { User, AudioRecord, PendingAudio, TelegramModalSeen, CourseRequest } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,6 +184,137 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (e) {
     console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.get('/api/auth/google/config', (_req, res) => {
+  res.json({ ok: true, clientId: process.env.GOOGLE_CLIENT_ID || '' });
+});
+
+const verifyGoogleIdToken = async (idToken) => {
+  const url =
+    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken);
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const data = await resp.json().catch(() => null);
+  if (!data || data.error || !data.email) return null;
+  const clientId = process.env.GOOGLE_CLIENT_ID || '';
+  if (clientId && data.aud !== clientId) return null;
+  if (data.email_verified === 'false' || data.email_verified === false) return null;
+  return {
+    sub: data.sub,
+    email: String(data.email).toLowerCase(),
+    givenName: data.given_name || '',
+    familyName: data.family_name || '',
+    picture: data.picture || '',
+  };
+};
+
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { credential, localUserId } = req.body;
+    if (!credential || typeof credential !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Google token topilmadi' });
+    }
+    const profile = await verifyGoogleIdToken(credential);
+    if (!profile) {
+      return res.status(401).json({ ok: false, error: 'Google akkauntni tasdiqlab bo\'lmadi' });
+    }
+
+    let user = await User.findOne({ email: profile.email }).lean();
+    if (!user && profile.sub) {
+      user = await User.findOne({ googleId: profile.sub }).lean();
+    }
+
+    if (user) {
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            googleId: user.googleId || profile.sub,
+            avatar: user.avatar || profile.picture || undefined,
+            firstName: user.firstName || profile.givenName || 'User',
+            lastName: user.lastName || profile.familyName || '',
+          },
+        }
+      ).catch(() => {});
+    } else {
+      const created = await User.create({
+        firstName: profile.givenName || 'User',
+        lastName: profile.familyName || '',
+        email: profile.email,
+        passwordHash: 'google_' + Math.random().toString(36).slice(2) + Date.now().toString(36),
+        googleId: profile.sub,
+        avatar: profile.picture || undefined,
+        localIds:
+          localUserId && typeof localUserId === 'string' && localUserId.startsWith('u_')
+            ? [localUserId]
+            : [],
+      });
+      user = created.toObject();
+    }
+
+    if (localUserId && typeof localUserId === 'string' && localUserId.startsWith('u_')) {
+      const localRecords = await AudioRecord.find({ userId: localUserId }).lean().catch(() => []);
+      if (localRecords.length) {
+        await AudioRecord.updateMany(
+          { userId: localUserId },
+          { $set: { userId: user._id.toString() } }
+        ).catch(() => {});
+      }
+    }
+
+    await recalcUserTotalWords(user._id);
+    user = await User.findById(user._id).lean();
+
+    res.json({
+      ok: true,
+      user: {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        totalWords: user.totalWords || 0,
+        joinedAt: user.joinedAt.toISOString(),
+        passwordHash: user.passwordHash,
+      },
+    });
+  } catch (e) {
+    console.error('[GOOGLE AUTH]', e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.post('/api/course-requests', async (req, res) => {
+  try {
+    const { fullName, phone, age, course, note, userId } = req.body || {};
+    const cleanName = (fullName || '').toString().trim();
+    const cleanPhone = (phone || '').toString().trim();
+    const cleanCourse = (course || '').toString().trim().toLowerCase();
+
+    if (cleanName.length < 3) {
+      return res.status(400).json({ ok: false, error: 'Ism familya kamida 3 ta belgidan iborat bo\'lsin' });
+    }
+    if (cleanPhone.replace(/\D/g, '').length < 9) {
+      return res.status(400).json({ ok: false, error: 'Telefon raqam noto\'g\'ri' });
+    }
+    if (!['english', 'biology', 'chemistry'].includes(cleanCourse)) {
+      return res.status(400).json({ ok: false, error: 'Kursni tanlang' });
+    }
+
+    await CourseRequest.create({
+      fullName: cleanName,
+      phone: cleanPhone,
+      age: (age || '').toString().trim(),
+      course: cleanCourse,
+      note: (note || '').toString().trim().slice(0, 1000),
+      userId: userId ? await normalizeUserId(userId) : undefined,
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[COURSE REQUEST]', e);
     res.status(500).json({ ok: false, error: 'Server xatosi' });
   }
 });

@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
 import { savePendingAudio, getUserRecords, getGlobalLeaderboard } from '../storage';
+import { typingPath } from '../sitePaths';
 import Layout from './Layout';
 
 interface DashboardProps {
@@ -56,7 +57,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       return;
     }
     const pending = savePendingAudio(file);
-    navigate(`/transcribe/${pending.tempId}`, { replace: true });
+    navigate(typingPath(`/transcribe/${pending.tempId}`), { replace: true });
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -91,7 +92,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                 <div className="text-lg font-bold">Reyting</div>
               </div>
               <Link
-                to="/leaderboard"
+                to={typingPath('/leaderboard')}
                 className="hidden sm:inline-flex items-center px-4 py-2.5 bg-white text-blue-700 font-semibold rounded-xl shadow-md hover:bg-blue-50 transition-all"
               >
                 🏆 Leaderboard
@@ -215,7 +216,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
 
         <div className="space-y-4 sm:space-y-5">
           <Link
-            to="/history"
+            to={typingPath('/history')}
             className="block bg-white rounded-2xl shadow-xl p-5 hover:shadow-2xl transition-all"
           >
             <div className="flex items-center gap-3 mb-3">
@@ -236,7 +237,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           </Link>
 
           <Link
-            to="/leaderboard"
+            to={typingPath('/leaderboard')}
             className="block bg-white rounded-2xl shadow-xl p-5 hover:shadow-2xl transition-all"
           >
             <div className="flex items-center gap-3 mb-3">
@@ -257,7 +258,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           </Link>
 
           <Link
-            to="/profile"
+            to={typingPath('/profile')}
             className="block bg-white rounded-2xl shadow-xl p-5 hover:shadow-2xl transition-all"
           >
             <div className="flex items-center gap-3 mb-3">

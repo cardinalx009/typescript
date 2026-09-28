@@ -8,6 +8,8 @@ const UserSchema = new mongoose.Schema({
   totalWords: { type: Number, default: 0 },
   joinedAt: { type: Date, default: Date.now },
   localIds: { type: [String], default: [], index: true },
+  googleId: { type: String, index: true, sparse: true },
+  avatar: { type: String },
 });
 
 const AudioRecordSchema = new mongoose.Schema({
@@ -46,3 +48,16 @@ export const User = mongoose.model('User', UserSchema);
 export const AudioRecord = mongoose.model('AudioRecord', AudioRecordSchema);
 export const PendingAudio = mongoose.model('PendingAudio', PendingAudioSchema);
 export const TelegramModalSeen = mongoose.model('TelegramModalSeen', TelegramModalSeenSchema);
+
+const CourseRequestSchema = new mongoose.Schema({
+  fullName: { type: String, required: true, trim: true },
+  phone: { type: String, required: true, trim: true },
+  age: { type: String, trim: true },
+  course: { type: String, required: true, trim: true, index: true },
+  note: { type: String, default: '', trim: true },
+  userId: { type: mongoose.Schema.Types.Mixed },
+  status: { type: String, enum: ['new', 'contacted', 'done'], default: 'new' },
+  createdAt: { type: Date, default: Date.now },
+});
+
+export const CourseRequest = mongoose.model('CourseRequest', CourseRequestSchema);

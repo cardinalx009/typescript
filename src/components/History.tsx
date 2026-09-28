@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
 import { getUserRecords, deleteRecord, buildEditTempId } from '../storage';
+import { typingPath } from '../sitePaths';
 import Layout from './Layout';
 
 interface HistoryProps {
@@ -104,7 +105,7 @@ export default function History({ user, onLogout }: HistoryProps) {
               Audioni tinglab, matn yozishni bugun boshlang!
             </p>
             <Link
-              to="/"
+              to={typingPath()}
               className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold rounded-xl shadow-lg"
             >
               Audio yuklash →
@@ -164,7 +165,7 @@ export default function History({ user, onLogout }: HistoryProps) {
                           <div className="text-xs text-gray-500">o'rn</div>
                         </div>
                         <Link
-                          to={`/transcribe/${buildEditTempId(r.id)}`}
+                          to={typingPath(`/transcribe/${buildEditTempId(r.id)}`)}
                           onClick={(e) => e.stopPropagation()}
                           className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
                             expired

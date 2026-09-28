@@ -7,6 +7,7 @@ import {
   hasSeenTelegramModal,
   markTelegramModalSeen,
 } from './storage';
+import { TYPING_BASE, SITE_PATHS } from './sitePaths';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Transcribe from './components/Transcribe';
@@ -14,6 +15,11 @@ import Profile from './components/Profile';
 import History from './components/History';
 import Leaderboard from './components/Leaderboard';
 import TelegramModal from './components/TelegramModal';
+import SiteLayout from './site/SiteLayout';
+import Home from './site/Home';
+import SubjectPage from './site/SubjectPage';
+import FullMock from './site/FullMock';
+import NotFound from './site/NotFound';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -65,78 +71,90 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-white"></div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-navy-800"></div>
       </div>
     );
   }
 
+  const requireAuth = (el: React.ReactNode) =>
+    user ? el : <Navigate to={SITE_PATHS.login} replace />;
+
   return (
     <>
       <Routes>
+        {/* ---- King School public / marketing site ---- */}
+        <Route element={<SiteLayout user={user} onLogout={handleLogout} />}>
+          <Route path="/" element={<Home user={user} />} />
+
+          <Route
+            path={SITE_PATHS.english}
+            element={<SubjectPage subject="english" user={user} />}
+          />
+          <Route
+            path={SITE_PATHS.biology}
+            element={<SubjectPage subject="biology" user={user} />}
+          />
+          <Route
+            path={SITE_PATHS.chemistry}
+            element={<SubjectPage subject="chemistry" user={user} />}
+          />
+
+          <Route
+            path={SITE_PATHS.fullMock}
+            element={requireAuth(<FullMock />)}
+          />
+
+          <Route
+            path={SITE_PATHS.login}
+            element={
+              user ? (
+                <Navigate to={SITE_PATHS.home} replace />
+              ) : (
+                <Login variant="site" onAuth={handleAuth} />
+              )
+            }
+          />
+          <Route
+            path={SITE_PATHS.signup}
+            element={
+              user ? (
+                <Navigate to={SITE_PATHS.home} replace />
+              ) : (
+                <Login
+                  variant="site"
+                  initialTab="register"
+                  onAuth={handleAuth}
+                />
+              )
+            }
+          />
+
+          <Route path="*" element={<NotFound />} />
+        </Route>
+
+        {/* ---- Typescript app (authenticated) ---- */}
         <Route
-          path="/login"
-          element={
-            user ? (
-              <Navigate to="/" replace />
-            ) : (
-              <Login onAuth={handleAuth} />
-            )
-          }
+          path={TYPING_BASE}
+          element={requireAuth(<Dashboard user={user!} onLogout={handleLogout} />)}
         />
         <Route
-          path="/"
-          element={
-            user ? (
-              <Dashboard user={user} onLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          path={`${TYPING_BASE}/transcribe/:tempId`}
+          element={requireAuth(<Transcribe user={user!} onLogout={handleLogout} />)}
         />
         <Route
-          path="/transcribe/:tempId"
-          element={
-            user ? (
-              <Transcribe user={user} onLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          path={`${TYPING_BASE}/profile`}
+          element={requireAuth(
+            <Profile user={user!} onLogout={handleLogout} onUpdate={setUser} />
+          )}
         />
         <Route
-          path="/profile"
-          element={
-            user ? (
-              <Profile user={user} onLogout={handleLogout} onUpdate={setUser} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          path={`${TYPING_BASE}/history`}
+          element={requireAuth(<History user={user!} onLogout={handleLogout} />)}
         />
         <Route
-          path="/history"
-          element={
-            user ? (
-              <History user={user} onLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/leaderboard"
-          element={
-            user ? (
-              <Leaderboard user={user} onLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="*"
-          element={<Navigate to={user ? '/' : '/login'} replace />}
+          path={`${TYPING_BASE}/leaderboard`}
+          element={requireAuth(<Leaderboard user={user!} onLogout={handleLogout} />)}
         />
       </Routes>
 
