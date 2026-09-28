@@ -1,6 +1,6 @@
 import { User } from '../types';
 import { Link, useLocation } from 'react-router-dom';
-import { SITE_PATHS, typingPath } from '../sitePaths';
+import { SITE_PATHS, typingPath, ADMIN_PATH } from '../sitePaths';
 
 interface LayoutProps {
   user: User;
@@ -59,6 +59,14 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
               >
                 ← King School
               </Link>
+              {user.isAdmin && (
+                <Link
+                  to={ADMIN_PATH}
+                  className="px-3 py-1.5 bg-amber-400/90 hover:bg-amber-500 text-navy-950 rounded-lg text-sm font-bold transition-all whitespace-nowrap"
+                >
+                  ⚙️ Admin
+                </Link>
+              )}
               <div className="hidden sm:flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-sky-500 flex items-center justify-center text-white font-bold text-sm shadow">
                   {user.firstName[0]}

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import { useI18n, Lang } from '../i18n';
-import { SITE_PATHS, typingPath } from '../sitePaths';
+import { SITE_PATHS, typingPath, ADMIN_PATH } from '../sitePaths';
 import { SUBJECTS } from './subjects';
+import { isAdminSession } from '../admin';
 
 interface SiteLayoutProps {
   user: User | null;
@@ -202,6 +203,20 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
                     >
                       📝 {t('navFullMock')}
                     </NavLink>
+                    {isAdminSession() && (
+                      <NavLink
+                        to={ADMIN_PATH}
+                        className={({ isActive }) =>
+                          `px-2.5 xl:px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                            isActive
+                              ? 'bg-amber-400 text-navy-950'
+                              : 'text-amber-700 hover:bg-amber-100'
+                          }`
+                        }
+                      >
+                        🛡️ Admin
+                      </NavLink>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-navy-100">
                     <div className="w-8 h-8 rounded-full bg-navy-800 text-white flex items-center justify-center text-xs font-bold">
@@ -291,6 +306,15 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
                   >
                     📝 {t('navFullMock')}
                   </Link>
+                  {isAdminSession() && (
+                    <Link
+                      to={ADMIN_PATH}
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-800 bg-amber-50"
+                    >
+                      🛡️ Admin
+                    </Link>
+                  )}
                 </div>
               )}
               <div className="flex sm:hidden items-center rounded-xl bg-navy-50 p-1 text-xs font-semibold mt-3 w-fit">

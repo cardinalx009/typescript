@@ -7,7 +7,7 @@ import {
   hasSeenTelegramModal,
   markTelegramModalSeen,
 } from './storage';
-import { TYPING_BASE, SITE_PATHS } from './sitePaths';
+import { TYPING_BASE, SITE_PATHS, ADMIN_PATH } from './sitePaths';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Transcribe from './components/Transcribe';
@@ -20,23 +20,31 @@ import Home from './site/Home';
 import SubjectPage from './site/SubjectPage';
 import FullMock from './site/FullMock';
 import NotFound from './site/NotFound';
+import AdminPanel from './site/AdminPanel';
+import { isAdminSession, clearAdminToken, ADMIN_USER } from './admin';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [adminActive, setAdminActive] = useState(isAdminSession());
   const [loading, setLoading] = useState(true);
   const [showTgModal, setShowTgModal] = useState(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   useEffect(() => {
+    const admin = isAdminSession();
+    setAdminActive(admin);
     const saved = getCurrentUser();
-    if (saved) setUser(saved);
+    if (admin) setUser(ADMIN_USER);
+    else if (saved) setUser(saved);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (user && justLoggedIn) {
-      if (!hasSeenTelegramModal(user.id)) {
+      if (user.isAdmin) {
+        setJustLoggedIn(false);
+      } else if (!hasSeenTelegramModal(user.id)) {
         timer = setTimeout(() => {
           setShowTgModal(true);
           setJustLoggedIn(false);
@@ -51,11 +59,14 @@ function App() {
   }, [user, justLoggedIn]);
 
   const handleLogout = () => {
+    clearAdminToken();
+    setAdminActive(false);
     setCurrentUser(null);
     setUser(null);
   };
 
   const handleAuth = (u: User, isNew: boolean) => {
+    setAdminActive(isAdminSession());
     setUser(u);
     setJustLoggedIn(isNew);
   };
@@ -83,6 +94,14 @@ function App() {
   return (
     <>
       <Routes>
+        {/* ---- Admin panel ---- */}
+        <Route
+          path={ADMIN_PATH}
+          element={
+            adminActive ? <AdminPanel onLogout={handleLogout} /> : <Navigate to={SITE_PATHS.login} replace />
+          }
+        />
+
         {/* ---- King School public / marketing site ---- */}
         <Route element={<SiteLayout user={user} onLogout={handleLogout} />}>
           <Route path="/" element={<Home user={user} />} />

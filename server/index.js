@@ -3,10 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import { User, AudioRecord, PendingAudio, TelegramModalSeen, CourseRequest } from './models.js';
+import { User, AudioRecord, PendingAudio, TelegramModalSeen, CourseRequest, MockFile } from './models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +92,47 @@ const simpleHashMatch = (p, h) => {
   return false;
 };
 
+const ADMIN_LOGIN = (process.env.ADMIN_LOGIN || 'kingschool777').toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'asadbekking777';
+
+const signAdminToken = () => {
+  const payload = Buffer.from(
+    JSON.stringify({ role: 'admin', exp: Date.now() + 7 * 24 * 60 * 60 * 1000 })
+  ).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', process.env.JWT_SECRET || 'king_school_secret')
+    .update(payload)
+    .digest('base64url');
+  return `${payload}.${sig}`;
+};
+
+const verifyAdminToken = (token) => {
+  if (!token || typeof token !== 'string') return false;
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return false;
+  const expected = crypto
+    .createHmac('sha256', process.env.JWT_SECRET || 'king_school_secret')
+    .update(payload)
+    .digest('base64url');
+  if (sig.length !== expected.length) return false;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    return data.role === 'admin' && data.exp > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!verifyAdminToken(token)) {
+    return res.status(401).json({ ok: false, error: 'Admin huquqi yo\'q' });
+  }
+  next();
+};
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'Asadbek Posts Listening API', uptime: process.uptime() });
 });
@@ -148,9 +191,18 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email?.trim() || !password) {
       return res.status(400).json({ ok: false, error: 'Email va parol kiriting' });
     }
+    if (email.trim().toLowerCase() === ADMIN_LOGIN) {
+      if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ ok: false, error: 'Parol noto\'g\'ri. Iltimos qayta urinib ko\'ring.' });
+      }
+      return res.json({ ok: true, admin: true, token: signAdminToken() });
+    }
     let user = await User.findOne({ email: email.toLowerCase() }).lean();
     if (!user) {
       return res.status(404).json({ ok: false, error: 'Bu email bilan hisob topilmadi. Avval ro\'yxatdan o\'ting.' });
+    }
+    if (user.isBlocked) {
+      return res.status(403).json({ ok: false, error: 'Akkauntingiz vaqtincha bloklangan. Administratorga murojaat qiling.' });
     }
     if (!simpleHashMatch(password, user.passwordHash)) {
       return res.status(401).json({ ok: false, error: 'Parol noto\'g\'ri. Iltimos qayta urinib ko\'ring.' });
@@ -225,6 +277,10 @@ app.post('/api/auth/google', async (req, res) => {
     let user = await User.findOne({ email: profile.email }).lean();
     if (!user && profile.sub) {
       user = await User.findOne({ googleId: profile.sub }).lean();
+    }
+
+    if (user && user.isBlocked) {
+      return res.status(403).json({ ok: false, error: 'Akkauntingiz vaqtincha bloklangan. Administratorga murojaat qiling.' });
     }
 
     if (user) {
@@ -669,11 +725,259 @@ app.post('/api/telegram/seen/:userId', async (req, res) => {
   }
 });
 
-if (process.env.NODE_ENV === 'production') {
-  const dist = path.resolve(__dirname, '..', 'dist');
-  app.use(express.static(dist));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(dist, 'index.html'));
+/* ===================== MOCK FILES ===================== */
+
+app.get('/api/mocks', async (req, res) => {
+  try {
+    const kind = req.query.kind === 'reading' ? 'reading' : 'listening';
+    const mocks = await MockFile.find({ kind }).sort({ createdAt: -1 }).lean();
+    res.json({
+      ok: true,
+      mocks: mocks.map((m) => ({
+        id: m._id.toString(),
+        kind: m.kind,
+        title: m.title,
+        fileName: m.fileName,
+        size: m.size,
+        createdAt: m.createdAt,
+      })),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.get('/api/mocks/:id', async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(404).json({ ok: false, error: 'Topilmadi' });
+    }
+    const mock = await MockFile.findById(req.params.id).lean();
+    if (!mock) return res.status(404).json({ ok: false, error: 'Topilmadi' });
+    res.json({ ok: true, mock: { id: mock._id.toString(), kind: mock.kind, title: mock.title, html: mock.html } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+/* ===================== ADMIN ===================== */
+
+app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
+  try {
+    const [users, records, totalWordsAgg, requests, newRequests, mocks] = await Promise.all([
+      User.countDocuments(),
+      AudioRecord.countDocuments(),
+      User.aggregate([{ $group: { _id: null, total: { $sum: '$totalWords' } } }]),
+      CourseRequest.countDocuments(),
+      CourseRequest.countDocuments({ status: 'new' }),
+      MockFile.countDocuments(),
+    ]);
+    res.json({
+      ok: true,
+      stats: {
+        users,
+        records,
+        totalWords: totalWordsAgg[0]?.total || 0,
+        requests,
+        newRequests,
+        mocks,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const filter = search
+      ? {
+          $or: [
+            { firstName: { $regex: search, $options: 'i' } },
+            { lastName: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+    const users = await User.find(filter).sort({ joinedAt: -1 }).lean();
+    const counts = await AudioRecord.aggregate([
+      { $group: { _id: '$userId', n: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c) => [String(c._id), c.n]));
+    res.json({
+      ok: true,
+      users: users.map((u) => ({
+        id: u._id.toString(),
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        totalWords: u.totalWords || 0,
+        recordCount: countMap.get(u._id.toString()) || 0,
+        isBlocked: !!u.isBlocked,
+        joinedAt: u.joinedAt,
+      })),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.get('/api/admin/users/:id/records', requireAdmin, async (req, res) => {
+  try {
+    const user = await findUserByAnyId(req.params.id);
+    if (!user) return res.status(404).json({ ok: false, error: 'Foydalanuvchi topilmadi' });
+    const possibleIds = [user._id.toString(), ...(user.localIds || [])];
+    const recs = await AudioRecord.find({ userId: { $in: possibleIds } })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({
+      ok: true,
+      user: {
+        id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      },
+      records: recs.map((r) => ({
+        id: r.localId || r._id.toString(),
+        audioName: r.audioName,
+        transcript: r.transcript || '',
+        wordCount: r.wordCount || 0,
+        progressSeconds: r.progressSeconds || 0,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.post('/api/admin/users/:id/block', requireAdmin, async (req, res) => {
+  try {
+    const user = await findUserByAnyId(req.params.id);
+    if (!user) return res.status(404).json({ ok: false, error: 'Foydalanuvchi topilmadi' });
+    const blocked = !!req.body?.blocked;
+    await User.updateOne({ _id: user._id }, { $set: { isBlocked: blocked } });
+    res.json({ ok: true, isBlocked: blocked });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const user = await findUserByAnyId(req.params.id);
+    if (!user) return res.status(404).json({ ok: false, error: 'Foydalanuvchi topilmadi' });
+    const possibleIds = [user._id.toString(), ...(user.localIds || [])];
+    await Promise.all([
+      AudioRecord.deleteMany({ userId: { $in: possibleIds } }),
+      PendingAudio.deleteMany({ userId: { $in: possibleIds } }),
+      TelegramModalSeen.deleteMany({ userId: { $in: possibleIds } }),
+      CourseRequest.deleteMany({ userId: { $in: possibleIds } }),
+    ]);
+    await User.deleteOne({ _id: user._id });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.get('/api/admin/requests', requireAdmin, async (_req, res) => {
+  try {
+    const requests = await CourseRequest.find().sort({ createdAt: -1 }).limit(300).lean();
+    res.json({ ok: true, requests });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.post('/api/admin/requests/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const status = ['new', 'contacted', 'done'].includes(req.body?.status)
+      ? req.body.status
+      : 'new';
+    await CourseRequest.updateOne({ _id: req.params.id }, { $set: { status } });
+    res.json({ ok: true, status });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.delete('/api/admin/requests/:id', requireAdmin, async (req, res) => {
+  try {
+    await CourseRequest.deleteOne({ _id: req.params.id });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.post('/api/admin/mocks', requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    const kind = req.body?.kind === 'reading' ? 'reading' : 'listening';
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: 'HTML fayl tanlanmagan' });
+    }
+    if (!/\.html?$/i.test(req.file.originalname)) {
+      return res.status(400).json({ ok: false, error: 'Faqat .html fayl yuklanadi' });
+    }
+    const html = req.file.buffer.toString('utf8');
+    if (!html.trim()) {
+      return res.status(400).json({ ok: false, error: 'Fayl bo\'sh' });
+    }
+    const title = (req.body?.title || '').trim() || req.file.originalname.replace(/\.html?$/i, '');
+    const mock = await MockFile.create({
+      kind,
+      title,
+      fileName: req.file.originalname,
+      html,
+      size: req.file.size,
+    });
+    res.json({
+      ok: true,
+      mock: {
+        id: mock._id.toString(),
+        kind: mock.kind,
+        title: mock.title,
+        fileName: mock.fileName,
+        size: mock.size,
+        createdAt: mock.createdAt,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+app.delete('/api/admin/mocks/:id', requireAdmin, async (req, res) => {
+  try {
+    await MockFile.deleteOne({ _id: req.params.id });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: 'Server xatosi' });
+  }
+});
+
+const distDir = path.resolve(__dirname, '..', 'dist');
+
+if (process.env.NODE_ENV === 'production' || fs.existsSync(path.join(distDir, 'index.html'))) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(distDir, 'index.html'));
   });
 }
 

@@ -10,6 +10,8 @@ const UserSchema = new mongoose.Schema({
   localIds: { type: [String], default: [], index: true },
   googleId: { type: String, index: true, sparse: true },
   avatar: { type: String },
+  isAdmin: { type: Boolean, default: false },
+  isBlocked: { type: Boolean, default: false },
 });
 
 const AudioRecordSchema = new mongoose.Schema({
@@ -61,3 +63,14 @@ const CourseRequestSchema = new mongoose.Schema({
 });
 
 export const CourseRequest = mongoose.model('CourseRequest', CourseRequestSchema);
+
+const MockFileSchema = new mongoose.Schema({
+  kind: { type: String, enum: ['listening', 'reading'], required: true, index: true },
+  title: { type: String, required: true, trim: true },
+  fileName: { type: String, required: true },
+  html: { type: String, required: true },
+  size: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now, index: true },
+});
+
+export const MockFile = mongoose.model('MockFile', MockFileSchema);

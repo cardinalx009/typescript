@@ -61,8 +61,9 @@ const recalcUserTotalWords = (userId: string) => {
 };
 
 export type AuthResult =
-  | { ok: true; user: User }
-  | { ok: false; error: string; user?: undefined };
+  | { ok: true; user: User; adminToken?: undefined; error?: undefined }
+  | { ok: true; user?: undefined; adminToken: string; error?: undefined }
+  | { ok: false; error: string; user?: undefined; adminToken?: undefined };
 
 const API_TIMEOUT_MS = 4000;
   
@@ -158,6 +159,9 @@ export const registerUser = async (
 
 export const loginUser = async (email: string, password: string): Promise<AuthResult> => {
   const api = await apiCall('/api/auth/login', 'POST', { email, password });
+  if (api.ok && api.data?.admin && api.data?.token) {
+    return { ok: true, adminToken: String(api.data.token) };
+  }
   if (api.ok && api.data?.user) {
     const u: User = {
       id: api.data.user.id,

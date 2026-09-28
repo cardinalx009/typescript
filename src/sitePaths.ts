@@ -1,3 +1,5 @@
+export const ADMIN_PATH = '/admin';
+
 export const TYPING_BASE = '/english/typing';
 
 export const typingPath = (path = '') => `${TYPING_BASE}${path}`;

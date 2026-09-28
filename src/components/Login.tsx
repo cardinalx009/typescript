@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import { registerUser, loginUser, googleLogin, getUsers } from '../storage';
+import { setAdminToken, ADMIN_USER } from '../admin';
 import { useI18n } from '../i18n';
-import { SITE_PATHS } from '../sitePaths';
+import { SITE_PATHS, ADMIN_PATH } from '../sitePaths';
 import GoogleSignInButton from './GoogleSignInButton';
 
 interface LoginProps {
@@ -49,8 +50,11 @@ export default function Login({ onAuth, variant = 'app', initialTab = 'login' }:
     if (!email.trim()) return setError(t('formErrEmail'));
     if (!password) return setError(t('formErrPassword'));
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return setError(t('formErrEmail'));
+    const isAdminLogin = email.trim().toLowerCase() === 'kingschool777';
+    if (!isAdminLogin) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) return setError(t('formErrEmail'));
+    }
 
     setLoading(true);
     try {
@@ -84,6 +88,13 @@ export default function Login({ onAuth, variant = 'app', initialTab = 'login' }:
         onAuth(res.user, true);
       } else {
         const res = await loginUser(email, password);
+        if (res.adminToken) {
+          setAdminToken(res.adminToken);
+          setLoading(false);
+          onAuth(ADMIN_USER, false);
+          navigate(ADMIN_PATH);
+          return;
+        }
         if (!res.ok || !res.user) {
           setLoading(false);
           return setError(res.error || t('formErrGeneric'));
@@ -233,13 +244,13 @@ export default function Login({ onAuth, variant = 'app', initialTab = 'login' }:
                 {t('authEmail')}
               </label>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={`${inputClass} ${inputTone}`}
                 placeholder="example@email.com"
                 disabled={loading}
-                autoComplete="email"
+                autoComplete="username"
               />
             </div>
 

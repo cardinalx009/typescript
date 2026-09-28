@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { User, AudioRecord } from '../types';
 import { getUserRecords, saveUsers, getUsers, setCurrentUser, apiCall } from '../storage';
+import { isAdminSession } from '../admin';
 import Layout from './Layout';
+import UsersManager from '../site/UsersManager';
 
 interface ProfileProps {
   user: User;
@@ -13,6 +15,8 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
   const [records, setRecords] = useState<AudioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const isAdmin = isAdminSession() && user.isAdmin === true;
 
   useEffect(() => {
     setLoading(true);
@@ -65,6 +69,22 @@ export default function Profile({ user, onLogout, onUpdate }: ProfileProps) {
       setRefreshing(false);
     }
   };
+
+  if (isAdmin) {
+    return (
+      <Layout user={user} onLogout={onLogout}>
+        <div className="rounded-2xl bg-white shadow-xl p-6">
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <span>🛡️</span> Foydalanuvchilar boshqaruvi
+          </h2>
+          <p className="text-sm text-gray-500 mt-1 mb-5">
+            Akkauntlarni bloklash, o'chirish va ularning yozgan matnlarini ko'rish.
+          </p>
+          <UsersManager />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout user={user} onLogout={onLogout}>
