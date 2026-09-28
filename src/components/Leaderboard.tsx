@@ -56,6 +56,12 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
   const top3 = users.slice(0, 3);
   const others = users.slice(3);
 
+  const PODIUM = [
+    { rank: 2, height: 'h-44', gradient: 'from-gray-300 to-gray-400' },
+    { rank: 1, height: 'h-56', gradient: 'from-yellow-400 to-amber-500' },
+    { rank: 3, height: 'h-36', gradient: 'from-orange-400 to-amber-600' },
+  ];
+
   if (loading) {
     return (
       <Layout user={user} onLogout={onLogout}>
@@ -110,27 +116,16 @@ export default function Leaderboard({ user, onLogout }: LeaderboardProps) {
 
         {top3.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[1, 0, 2].map((i) => {
-              if (!top3[i]) return null;
-              const u = top3[i];
-              const rank = i + 1;
-              const heights = [
-                'h-48',
-                'h-56',
-                'h-40',
-              ];
-              const colors = [
-                'from-gray-300 to-gray-400',
-                'from-yellow-400 to-amber-500',
-                'from-orange-400 to-amber-600',
-              ];
+            {PODIUM.map(({ rank, height, gradient }) => {
+              const u = top3[rank - 1];
+              if (!u) return null;
               return (
                 <div key={u.id} className="flex flex-col items-center justify-end">
                   <div
-                    className={`w-full rounded-t-2xl bg-gradient-to-t ${colors[i]} ${heights[i]} p-5 flex flex-col items-center justify-between text-white shadow-xl`}
+                    className={`w-full rounded-t-2xl bg-gradient-to-t ${gradient} ${height} p-5 flex flex-col items-center justify-between text-white shadow-xl`}
                   >
                     <div className="text-5xl">{getMedal(rank)}</div>
-                    <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur flex items-center justify-center font-bold text-2xl">
+                    <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur flex items-center justify-center font-bold text-2xl uppercase">
                       {u.firstName[0]}
                       {u.lastName[0]}
                     </div>
