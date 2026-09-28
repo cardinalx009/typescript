@@ -97,6 +97,8 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
             progressSeconds: rec.progressSeconds,
             pending: null,
           });
+          setAudioName(rec.audioName);
+          setTranscript(rec.transcript);
           setRecordId(rec.id);
           setStepOne(true);
         }
@@ -451,7 +453,8 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
       lastProgressSaveRef.current = Date.now();
       try {
         if (!recordIdRef.current) {
-          await addRecord(user.id, audioName, transcript, currentTimeRef.current);
+          const rec = await addRecord(user.id, audioName, transcript, currentTimeRef.current, undefined, tempId || undefined);
+          recordIdRef.current = rec.id;
         } else {
           await updateRecord(recordIdRef.current, {
             transcript,

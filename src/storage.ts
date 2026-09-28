@@ -343,21 +343,6 @@ export const getRecords = (): AudioRecord[] => {
       }
     }
   }
-  const bestByKey = new Map<string, AudioRecord>();
-  for (const r of records) {
-    const key = `${r.userId}|${r.audioName}|${r.createdAt}`;
-    const kept = bestByKey.get(key);
-    if (!kept) {
-      bestByKey.set(key, r);
-    } else if (!kept.transcript && r.transcript) {
-      bestByKey.set(key, r);
-      records.splice(records.indexOf(kept), 1);
-      changed = true;
-    } else {
-      records.splice(records.indexOf(r), 1);
-      changed = true;
-    }
-  }
   if (changed) saveRecordsRaw(records);
   return records;
 };
