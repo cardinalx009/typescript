@@ -92,6 +92,10 @@ function App() {
             element={<SubjectPage subject="english" user={user} />}
           />
           <Route
+            path={SITE_PATHS.native}
+            element={<SubjectPage subject="native" user={user} />}
+          />
+          <Route
             path={SITE_PATHS.biology}
             element={<SubjectPage subject="biology" user={user} />}
           />

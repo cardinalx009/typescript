@@ -299,7 +299,7 @@ app.post('/api/course-requests', async (req, res) => {
     if (cleanPhone.replace(/\D/g, '').length < 9) {
       return res.status(400).json({ ok: false, error: 'Telefon raqam noto\'g\'ri' });
     }
-    if (!['english', 'biology', 'chemistry'].includes(cleanCourse)) {
+    if (!['english', 'native', 'science'].includes(cleanCourse)) {
       return res.status(400).json({ ok: false, error: 'Kursni tanlang' });
     }
 

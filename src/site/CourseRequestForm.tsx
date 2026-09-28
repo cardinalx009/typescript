@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { useI18n } from '../i18n';
 import { apiCall } from '../storage';
-import { SUBJECTS, SubjectKey } from './subjects';
+import { COURSES, CourseKey } from './subjects';
 
 interface Props {
-  defaultCourse: SubjectKey;
+  defaultCourse: CourseKey;
   userId?: string;
 }
 
 export default function CourseRequestForm({ defaultCourse, userId }: Props) {
   const { t } = useI18n();
-  const [course, setCourse] = useState<SubjectKey>(defaultCourse);
+  const [course, setCourse] = useState<CourseKey>(defaultCourse);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
@@ -128,12 +128,12 @@ export default function CourseRequestForm({ defaultCourse, userId }: Props) {
           </label>
           <select
             value={course}
-            onChange={(e) => setCourse(e.target.value as SubjectKey)}
+            onChange={(e) => setCourse(e.target.value as CourseKey)}
             className={field}
           >
-            {SUBJECTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {t(s.nameKey)}
+            {COURSES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {t(c.nameKey)}
               </option>
             ))}
           </select>

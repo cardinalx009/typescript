@@ -7,6 +7,7 @@ export const SITE_PATHS = {
   login: '/login',
   signup: '/signup',
   english: '/english',
+  native: '/native-language',
   biology: '/biology',
   chemistry: '/chemistry',
   fullMock: '/full-mock',

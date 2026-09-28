@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { User } from '../types';
 import { useI18n, Lang } from '../i18n';
 import { SITE_PATHS, typingPath } from '../sitePaths';
+import { SUBJECTS } from './subjects';
 
 interface SiteLayoutProps {
   user: User | null;
@@ -16,9 +17,11 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [subjectsOpen, setSubjectsOpen] = useState(false);
 
   const go = (path: string) => {
     setMenuOpen(false);
+    setSubjectsOpen(false);
     if (path.startsWith('/#')) {
       navigate(path);
       setTimeout(() => {
@@ -31,18 +34,16 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
   };
 
   const linkClass = (path: string) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `px-2.5 xl:px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
       location.pathname === path
         ? 'text-navy-800 bg-navy-50'
         : 'text-slate-600 hover:text-navy-800 hover:bg-navy-50/70'
     }`;
 
+  const subjectPaths = SUBJECTS.map((s) => s.path);
+
   const mainLinks = [
     { label: t('navHome'), path: SITE_PATHS.home },
-    { label: t('navSubjects'), path: '/#subjects' },
-    { label: t('subjectEnglish'), path: SITE_PATHS.english },
-    { label: t('subjectBiology'), path: SITE_PATHS.biology },
-    { label: t('subjectChemistry'), path: SITE_PATHS.chemistry },
     { label: t('navContacts'), path: '/#contact' },
   ];
 
@@ -51,24 +52,97 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-navy-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
-            <Link to={SITE_PATHS.home} className="flex items-center gap-3 shrink-0">
+            <Link
+              to={SITE_PATHS.home}
+              className={`flex items-center shrink-0 transition-all ${
+                user ? 'gap-2' : 'gap-3'
+              }`}
+            >
               <img
                 src={LOGO}
                 alt="King School"
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover ring-2 ring-navy-100"
+                className={`rounded-xl object-cover ring-2 ring-navy-100 transition-all ${
+                  user ? 'w-8 h-8 sm:w-9 sm:h-9' : 'w-10 h-10 sm:w-12 sm:h-12'
+                }`}
               />
               <div className="leading-tight">
-                <div className="font-extrabold text-navy-900 text-base sm:text-lg tracking-wide">
+                <div
+                  className={`font-extrabold text-navy-900 tracking-wide whitespace-nowrap transition-all ${
+                    user ? 'text-[13px] sm:text-sm' : 'text-base sm:text-lg'
+                  }`}
+                >
                   {t('brandName')}
                 </div>
-                <div className="text-[11px] sm:text-xs text-navy-400 font-medium tracking-widest uppercase">
+                <div
+                  className={`text-navy-400 font-medium tracking-widest uppercase whitespace-nowrap transition-all ${
+                    user ? 'text-[9px] sm:text-[10px]' : 'text-[11px] sm:text-xs'
+                  }`}
+                >
                   {t('brandSub')}
                 </div>
               </div>
             </Link>
 
             <nav className="hidden lg:flex items-center gap-1">
-              {mainLinks.map((l) => (
+              {mainLinks.slice(0, 1).map((l) => (
+                <button
+                  key={l.path}
+                  type="button"
+                  onClick={() => go(l.path)}
+                  className={linkClass(l.path)}
+                >
+                  {l.label}
+                </button>
+              ))}
+
+              <div
+                className="relative"
+                onMouseEnter={() => setSubjectsOpen(true)}
+                onMouseLeave={() => setSubjectsOpen(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSubjectsOpen((v) => !v)}
+                  className={`px-2.5 xl:px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                    subjectPaths.includes(location.pathname)
+                      ? 'text-navy-800 bg-navy-50'
+                      : 'text-slate-600 hover:text-navy-800 hover:bg-navy-50/70'
+                  }`}
+                >
+                  {t('navSubjects')} ▾
+                </button>
+
+                {subjectsOpen && (
+                  <div className="absolute left-0 top-full pt-1 w-60">
+                    <div className="bg-white rounded-2xl shadow-soft ring-1 ring-slate-200/70 p-2">
+                      {SUBJECTS.map((s) => (
+                        <Link
+                          key={s.key}
+                          to={s.path}
+                          onClick={() => setSubjectsOpen(false)}
+                          className={`flex items-start gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                            location.pathname === s.path
+                              ? 'bg-navy-50'
+                              : 'hover:bg-navy-50/70'
+                          }`}
+                        >
+                          <span className="text-lg leading-none pt-0.5">{s.icon}</span>
+                          <span className="leading-tight">
+                            <span className="block text-sm font-semibold text-navy-900">
+                              {t(s.nameKey)}
+                            </span>
+                            <span className="block text-xs text-slate-500 mt-0.5 line-clamp-2">
+                              {t(s.descKey)}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {mainLinks.slice(1).map((l) => (
                 <button
                   key={l.path}
                   type="button"
@@ -100,14 +174,14 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
 
               {user ? (
                 <>
-                  <div className="hidden md:flex items-center gap-1.5 pl-2 ml-1 border-l border-navy-100">
-                    <span className="text-[11px] uppercase tracking-wider text-navy-400 font-semibold mr-1">
+                  <div className="hidden md:flex items-center gap-1 pl-2 ml-1 border-l border-navy-100">
+                    <span className="hidden 2xl:inline text-[11px] uppercase tracking-wider text-navy-400 font-semibold mr-1">
                       {t('navSections')}
                     </span>
                     <NavLink
                       to={typingPath()}
                       className={({ isActive }) =>
-                        `px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        `px-2.5 xl:px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                           isActive
                             ? 'bg-navy-800 text-white'
                             : 'text-navy-700 hover:bg-navy-100'
@@ -119,7 +193,7 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
                     <NavLink
                       to={SITE_PATHS.fullMock}
                       className={({ isActive }) =>
-                        `px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        `px-2.5 xl:px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                           isActive
                             ? 'bg-navy-800 text-white'
                             : 'text-navy-700 hover:bg-navy-100'
@@ -130,17 +204,17 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
                     </NavLink>
                   </div>
                   <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-navy-100">
-                    <div className="w-9 h-9 rounded-full bg-navy-800 text-white flex items-center justify-center text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-navy-800 text-white flex items-center justify-center text-xs font-bold">
                       {user.firstName?.[0]}
                       {user.lastName?.[0]}
                     </div>
-                    <span className="hidden xl:block text-sm font-semibold text-navy-900 max-w-[120px] truncate">
+                    <span className="hidden 2xl:block text-sm font-semibold text-navy-900 max-w-[120px] truncate">
                       {user.firstName}
                     </span>
                     <button
                       type="button"
                       onClick={onLogout}
-                      className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      className="px-2.5 xl:px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >
                       {t('navLogout')}
                     </button>
@@ -186,6 +260,21 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
                   {l.label}
                 </button>
               ))}
+              <div className="pt-2 mt-2 border-t border-navy-100">
+                <div className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {t('navSubjects')}
+                </div>
+                {SUBJECTS.map((s) => (
+                  <Link
+                    key={s.key}
+                    to={s.path}
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-navy-50"
+                  >
+                    {s.icon} {t(s.nameKey)}
+                  </Link>
+                ))}
+              </div>
               {user && (
                 <div className="pt-2 mt-2 border-t border-navy-100 space-y-1">
                   <Link
@@ -261,6 +350,11 @@ export default function SiteLayout({ user, onLogout }: SiteLayoutProps) {
               <li>
                 <Link to={SITE_PATHS.english} className="hover:text-white transition-colors">
                   {t('subjectEnglish')}
+                </Link>
+              </li>
+              <li>
+                <Link to={SITE_PATHS.native} className="hover:text-white transition-colors">
+                  {t('subjectNative')}
                 </Link>
               </li>
               <li>

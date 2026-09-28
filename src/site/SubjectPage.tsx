@@ -113,7 +113,7 @@ export default function SubjectPage({ subject, user }: Props) {
 
           <aside className="space-y-6">
             <div className="lg:sticky lg:top-28">
-              <CourseRequestForm defaultCourse={subject} userId={user?.id} />
+              <CourseRequestForm defaultCourse={meta.courseKey} userId={user?.id} />
             </div>
           </aside>
         </div>

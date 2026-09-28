@@ -81,7 +81,7 @@ export default function Home({ user }: { user: User | null }) {
 
             <div className="mt-12 flex flex-wrap gap-8">
               {[
-                { value: '3', label: t('heroStatCourses') },
+                { value: '4', label: t('heroStatCourses') },
                 { value: '24/7', label: t('heroStatAccess') },
                 { value: '100%', label: t('heroStatOnline') },
               ].map((s) => (
@@ -103,7 +103,7 @@ export default function Home({ user }: { user: User | null }) {
           <p className="mt-3 text-slate-600">{t('subjectsText')}</p>
         </div>
 
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {SUBJECTS.map((s) => (
             <Link
               key={s.key}

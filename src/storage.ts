@@ -65,7 +65,7 @@ export type AuthResult =
   | { ok: false; error: string; user?: undefined };
 
 const API_TIMEOUT_MS = 4000;
-
+  
 export const apiCall = async (
   path: string,
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',

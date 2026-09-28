@@ -28,13 +28,18 @@ const uz = {
   navMenu: 'Menyu',
 
   subjectEnglish: 'Ingliz tili',
+  subjectNative: 'Ona tili',
   subjectBiology: 'Biologiya',
   subjectChemistry: 'Kimyo',
+
+  courseEnglish: 'Ingliz tili',
+  courseNative: 'Ona tili',
+  courseScience: 'Biologiya va Kimyo',
 
   heroBadge: 'Zamonaviy ta\'lim markazi',
   heroTitle: 'King School Learning Center',
   heroText:
-    'Ingilis tili, biologiya va kimyo fanlarini professional darajada o\'rganish uchun zamonaviy ta\'lim muhiti. Kirish va boshlang.',
+    'Ingilis tili, ona tili, biologiya va kimyo fanlarini professional darajada o\'rganish uchun zamonaviy ta\'lim muhiti. Kirish va boshlang.',
   heroCtaSignup: 'Boshlang',
   heroCtaSubjects: 'Fanlar haqida',
   heroStatCourses: 'ta fan',
@@ -56,6 +61,13 @@ const uz = {
   englishGoMock: 'Full mock test',
   englishNote:
     'Typescript va Full mock bo\'limlari faqat ro\'yxatdan o\'tgan foydalanuvchilarga ochiladi.',
+
+  nativeDesc:
+    'Ona tilida grammatika, she\'riyat va tahlil. Matn yozish, so\'z boyligi va adabiyot darslari.',
+  nativeTopic1: 'Grammatika va morfologiya',
+  nativeTopic2: 'Badiiy matn tahlili',
+  nativeTopic3: 'She\'riyat va she\'r',
+  nativeTopic4: 'Nutq madaniyati',
 
   bioDesc:
     'Biologiya fanidan hujjatli, sxematik va sodda tildagi darslar. Maktab dasturi va imtihonga tayyorgarlik.',
@@ -137,7 +149,7 @@ const uz = {
   formErrGeneric: 'Xatolik yuz berdi',
 
   footerAbout:
-    'King School — zamonaviy ta\'lim markazi. Ingilis tili, biologiya va kimyo fanlarida onlayn va ofis darslari.',
+    'King School — zamonaviy ta\'lim markazi. Inglis tili, ona tili, biologiya va kimyo fanlarida onlayn va ofis darslari.',
   footerLinks: 'Tezkor havolalar',
   footerContacts: 'Bog\'lanish',
   footerTelegram: 'Telegram kanal',
@@ -168,13 +180,18 @@ const en: Record<TKey, string> = {
   navMenu: 'Menu',
 
   subjectEnglish: 'English',
+  subjectNative: 'Mother tongue',
   subjectBiology: 'Biology',
   subjectChemistry: 'Chemistry',
+
+  courseEnglish: 'English',
+  courseNative: 'Mother tongue',
+  courseScience: 'Biology and Chemistry',
 
   heroBadge: 'Modern learning center',
   heroTitle: 'King School Learning Center',
   heroText:
-    'A modern learning environment to master English, biology and chemistry with professional methods. Register and get started.',
+    'A modern learning environment to master English, mother tongue, biology and chemistry with professional methods. Register and get started.',
   heroCtaSignup: 'Get started',
   heroCtaSubjects: 'About subjects',
   heroStatCourses: 'subjects',
@@ -196,6 +213,13 @@ const en: Record<TKey, string> = {
   englishGoMock: 'Full mock test',
   englishNote:
     'Typescript and Full mock sections are available for registered users only.',
+
+  nativeDesc:
+    'Mother tongue grammar, poetry and analysis: writing, vocabulary and literature lessons.',
+  nativeTopic1: 'Grammar and morphology',
+  nativeTopic2: 'Literary text analysis',
+  nativeTopic3: 'Poetry and verse',
+  nativeTopic4: 'Speech culture',
 
   bioDesc:
     'Biology lessons explained clearly with diagrams and examples. School curriculum and exam preparation.',
@@ -277,7 +301,7 @@ const en: Record<TKey, string> = {
   formErrGeneric: 'Something went wrong',
 
   footerAbout:
-    'King School is a modern learning center offering online and offline classes in English, biology and chemistry.',
+    'King School is a modern learning center offering online and offline classes in English, mother tongue, biology and chemistry.',
   footerLinks: 'Quick links',
   footerContacts: 'Contact',
   footerTelegram: 'Telegram channel',
