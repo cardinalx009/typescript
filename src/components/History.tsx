@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, AudioRecord } from '../types';
-import { getUserRecords, deleteRecord, buildEditTempId } from '../storage';
+import { fetchUserRecords, deleteRecord, buildEditTempId } from '../storage';
 import { typingPath } from '../sitePaths';
 import Layout from './Layout';
 
@@ -17,16 +17,22 @@ export default function History({ user, onLogout }: HistoryProps) {
   const [confirming, setConfirming] = useState<AudioRecord | null>(null);
 
   useEffect(() => {
+    let alive = true;
     setLoading(true);
-    setRecords(getUserRecords(user.id));
-    setLoading(false);
+    fetchUserRecords(user.id).then((list) => {
+      if (!alive) return;
+      setRecords(list);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
   }, [user.id]);
 
-  const handleDelete = (record: AudioRecord) => {
-    if (deleteRecord(record.id)) {
-      setRecords(getUserRecords(user.id));
-      if (selected === record.id) setSelected(null);
-    }
+  const handleDelete = async (record: AudioRecord) => {
+    await deleteRecord(record.id);
+    setRecords(await fetchUserRecords(user.id));
+    if (selected === record.id) setSelected(null);
     setConfirming(null);
   };
 
@@ -45,18 +51,6 @@ export default function History({ user, onLogout }: HistoryProps) {
     const mins = Math.floor(t / 60);
     const secs = Math.floor(t % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getTimeLeft = (expiresAt: string) => {
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return 'Muddati tugagan';
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours >= 24) {
-      const days = Math.floor(hours / 24);
-      return `${days} kun qoldi`;
-    }
-    return `${hours} soat ${mins} daqiqa`;
   };
 
   const totalWords = records.reduce((sum, r) => sum + r.wordCount, 0);
@@ -83,8 +77,8 @@ export default function History({ user, onLogout }: HistoryProps) {
             </div>
           </div>
           <p className="text-gray-500 text-sm">
-            Oxirgi 1 kun ichida saqlangan matnlaringiz. 1 kundan so'ng audio va matn
-            avtomatik o'chadi, faqat statistika qoladi.
+            Barcha yozgan matnlaringiz saqlanadi va har qanday qurilmadan kirib
+            ko'ra olasiz.
           </p>
         </div>
 
@@ -115,8 +109,6 @@ export default function History({ user, onLogout }: HistoryProps) {
           <div className="space-y-3">
             {records.map((r) => {
               const isOpen = selected === r.id;
-              const timeLeft = getTimeLeft(r.expiresAt);
-              const expired = new Date(r.expiresAt).getTime() < Date.now();
               return (
                 <div
                   key={r.id}
@@ -130,14 +122,8 @@ export default function History({ user, onLogout }: HistoryProps) {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-                            expired
-                              ? 'bg-gray-100 text-gray-500'
-                              : 'bg-gradient-to-br from-blue-500 to-sky-500 text-white'
-                          }`}
-                        >
-                          {expired ? '📦' : '🎵'}
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-gradient-to-br from-blue-500 to-sky-500 text-white">
+                          🎵
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-gray-800 truncate">
@@ -145,9 +131,6 @@ export default function History({ user, onLogout }: HistoryProps) {
                           </div>
                           <div className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-2 sm:gap-4 mt-1">
                             <span>📅 {formatDateTime(r.createdAt)}</span>
-                            <span className={expired ? 'text-red-500' : 'text-amber-600'}>
-                              ⏳ {timeLeft}
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -167,13 +150,9 @@ export default function History({ user, onLogout }: HistoryProps) {
                         <Link
                           to={typingPath(`/transcribe/${buildEditTempId(r.id)}`)}
                           onClick={(e) => e.stopPropagation()}
-                          className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
-                            expired
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed pointer-events-none'
-                              : 'bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white shadow-md'
-                          }`}
+                          className="px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white shadow-md"
                         >
-                          {expired ? 'Muddati o\'tgan' : 'Davom etirish →'}
+                          Davom etirish →
                         </Link>
                         <button
                           type="button"
@@ -188,7 +167,7 @@ export default function History({ user, onLogout }: HistoryProps) {
                       </div>
                     </div>
                   </div>
-                  {isOpen && !expired && r.transcript && (
+                  {isOpen && r.transcript && (
                     <div className="border-t border-gray-100 p-5 sm:p-6 bg-gray-50">
                       <div className="text-xs text-gray-500 mb-2 font-medium">
                         📄 Matn (preview)

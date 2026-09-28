@@ -349,27 +349,47 @@ const pushRecordToServer = async (record: AudioRecord, force = false) => {
   applyServerTotal(record.userId, resp.data?.userTotal);
 };
 
-export const getRecords = (): AudioRecord[] => {
-  const now = Date.now();
-  const records = getRecordsRaw();
-  let changed = false;
-  for (const r of records) {
-    const expiresNum = new Date(r.expiresAt).getTime();
-    if (r.expiresAt && now > expiresNum) {
-      if (r.transcript !== '') {
-        r.transcript = '';
-        changed = true;
-      }
-    }
-  }
-  if (changed) saveRecordsRaw(records);
-  return records;
-};
+export const getRecords = (): AudioRecord[] => getRecordsRaw();
 
 export const getUserRecords = (userId: string): AudioRecord[] => {
-  return getRecords()
+  return getRecordsRaw()
     .filter((r) => r.userId === userId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+const normalizeServerRecord = (r: any, userId: string): AudioRecord => ({
+  id: r.localId || r.id,
+  userId,
+  audioName: r.audioName || 'Audio',
+  transcript: typeof r.transcript === 'string' ? r.transcript : '',
+  wordCount: typeof r.wordCount === 'number' ? r.wordCount : 0,
+  progressSeconds: typeof r.progressSeconds === 'number' ? r.progressSeconds : 0,
+  createdAt: r.createdAt || new Date().toISOString(),
+  expiresAt: r.expiresAt || r.createdAt || new Date().toISOString(),
+  lastEditedAt: r.lastEditedAt || r.createdAt || new Date().toISOString(),
+});
+
+export const fetchUserRecords = async (userId: string): Promise<AudioRecord[]> => {
+  const api = await apiCall(`/api/users/${encodeURIComponent(userId)}/records`, 'GET');
+
+  if (api.ok && Array.isArray(api.data?.records)) {
+    const remote = (api.data.records as any[]).map((r) => normalizeServerRecord(r, userId));
+    const local = getRecordsRaw();
+    const byId = new Map<string, AudioRecord>();
+    for (const r of local) byId.set(r.id, r);
+    for (const r of remote) {
+      const existing = byId.get(r.id);
+      byId.set(r.id, existing ? { ...existing, ...r, userId } : r);
+    }
+    const merged = Array.from(byId.values());
+    saveRecordsRaw(merged);
+    applyServerTotal(userId, api.data?.totalWords);
+    return merged
+      .filter((r) => r.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  return getUserRecords(userId);
 };
 
 export const getRecord = (id: string): AudioRecord | null => {
@@ -450,29 +470,15 @@ export const updateRecord = (
   return r;
 };
 
-export const deleteRecord = (id: string): boolean => {
+export const deleteRecord = async (id: string): Promise<boolean> => {
+  const resp = await apiCall(`/api/records/${id}`, 'DELETE');
   const records = getRecordsRaw();
   const idx = records.findIndex((r) => r.id === id);
-  if (idx < 0) return false;
+  if (idx < 0) return resp.ok;
   const removed = records.splice(idx, 1)[0];
   saveRecordsRaw(records);
   serverRecordIds.delete(id);
-  recalcUserTotalWords(removed.userId);
-  const cur = getCurrentUser();
-  if (cur && cur.id === removed.userId) {
-    const words = recalcUserTotalWords(removed.userId);
-    const updated = { ...cur, totalWords: words };
-    setCurrentUser(updated);
-    const users = getUsers();
-    const ui = users.findIndex((u) => u.id === removed.userId);
-    if (ui >= 0) {
-      users[ui] = updated;
-      saveUsers(users);
-    }
-  }
-  void apiCall(`/api/records/${id}`, 'DELETE').then((resp) => {
-    if (resp.ok) applyServerTotal(removed.userId, resp.data?.userTotal);
-  });
+  if (resp.ok) applyServerTotal(removed.userId, resp.data?.userTotal);
   return true;
 };
 

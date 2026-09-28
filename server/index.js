@@ -536,7 +536,6 @@ app.delete('/api/records/:id', async (req, res) => {
 
 app.get('/api/users/:userId/records', async (req, res) => {
   try {
-    const now = new Date();
     const user = await findUserByAnyId(req.params.userId);
     let queryIds = [req.params.userId];
     let totalWordsFromUser = null;
@@ -557,15 +556,12 @@ app.get('/api/users/:userId/records', async (req, res) => {
       .sort({ lastEditedAt: -1 })
       .lean();
     const stripped = recs.map((r) => {
-      const expired = r.expiresAt && r.expiresAt < now;
-      if (expired) {
-        return recordToJSON({
-          ...r,
-          transcript: '',
-          audioObjectKey: undefined,
-        });
+      const json = recordToJSON(r);
+      if (!json.localId) {
+        json.localId = json.id;
+        json.id = json.id;
       }
-      return recordToJSON(r);
+      return { ...json, audioObjectKey: undefined };
     });
     res.json({ ok: true, records: stripped, totalWords: totalWordsFromUser });
   } catch (e) {
