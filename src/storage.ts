@@ -193,7 +193,14 @@ export const loginUser = async (email: string, password: string): Promise<AuthRe
 };
 
 export const googleLogin = async (credential: string): Promise<AuthResult> => {
-  const api = await apiCall('/api/auth/google', 'POST', { credential });
+  // Google bilan birinchi marta kirilganda eski lokal yozuvlar
+  // serverdagi yangi userId ga ko'chirilishi uchun yuboriladi
+  const localUserId = getCurrentUser()?.id || '';
+
+  const api = await apiCall('/api/auth/google', 'POST', {
+    credential,
+    localUserId,
+  });
   if (api.ok && api.data?.user) {
     const u: User = {
       id: api.data.user.id,

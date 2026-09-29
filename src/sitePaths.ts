@@ -14,3 +14,5 @@ export const SITE_PATHS = {
   chemistry: '/chemistry',
   fullMock: '/full-mock',
 } as const;
+
+export const mockViewPath = (id: string) => `/full-mock/view/${id}`;

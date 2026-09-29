@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MockFileItem } from '../types';
 import { isAdminSession, uploadMockFile, deleteMockFile } from '../admin';
 import { useI18n } from '../i18n';
+import { mockViewPath } from '../sitePaths';
 
 type Kind = 'listening' | 'reading';
 
@@ -39,9 +40,6 @@ export default function FullMock() {
   const [kind, setKind] = useState<Kind>('listening');
   const [mocks, setMocks] = useState<MockFileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [html, setHtml] = useState('');
-  const [htmlLoading, setHtmlLoading] = useState(false);
 
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -57,23 +55,11 @@ export default function FullMock() {
   }, []);
 
   useEffect(() => {
-    setOpenId(null);
-    setHtml('');
     load(kind);
   }, [kind, load]);
 
-  const openMock = async (m: MockFileItem) => {
-    setHtmlLoading(true);
-    setOpenId(m.id);
-    setHtml('');
-    try {
-      const res = await fetch(`/api/mocks/${m.id}`);
-      const data = await res.json();
-      if (data?.ok) setHtml(data.mock.html);
-    } catch {
-      setHtml('<p style="font-family:sans-serif;padding:24px">Yuklab olishda xatolik</p>');
-    }
-    setHtmlLoading(false);
+  const openMock = (m: MockFileItem) => {
+    window.open(mockViewPath(m.id), '_blank', 'noopener,noreferrer');
   };
 
   const handleUpload = async () => {
@@ -94,13 +80,8 @@ export default function FullMock() {
   const handleDelete = async (m: MockFileItem) => {
     if (!confirm(`"${m.title}" o'chirilsinmi?`)) return;
     const res = await deleteMockFile(m.id);
-    if (res.ok) {
-      if (openId === m.id) setOpenId(null);
-      load(kind);
-    }
+    if (res.ok) load(kind);
   };
-
-  const current = mocks.find((m) => m.id === openId) || null;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
@@ -191,16 +172,19 @@ export default function FullMock() {
         {mocks.map((m) => (
           <div
             key={m.id}
-            className={`group rounded-2xl bg-white ring-1 shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5 ${
-              openId === m.id ? 'ring-navy-400' : 'ring-slate-200/80'
-            }`}
+            className="group rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm transition-all hover:shadow-lg hover:-translate-y-0.5"
           >
             <button
               type="button"
               onClick={() => openMock(m)}
               className="w-full text-left p-5"
             >
-              <div className="text-2xl">{kind === 'listening' ? '🎧' : '📖'}</div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-2xl">{kind === 'listening' ? '🎧' : '📖'}</div>
+                <span className="text-[11px] font-bold text-navy-700 bg-navy-50 px-2 py-1 rounded-lg whitespace-nowrap">
+                  Oynada ochish ↗
+                </span>
+              </div>
               <div className="mt-2 font-bold text-navy-900 line-clamp-2">{m.title}</div>
               <div className="mt-1 text-xs text-slate-400">
                 {m.fileName} · {fmtSize(m.size)} · {fmtDate(m.createdAt)}
@@ -220,39 +204,6 @@ export default function FullMock() {
           </div>
         ))}
       </div>
-
-      {/* Viewer */}
-      {current && (
-        <div className="mt-10 rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <div className="mr-auto min-w-0">
-              <div className="font-bold text-navy-900 truncate">{current.title}</div>
-              <div className="text-[11px] text-slate-400">{current.fileName}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpenId(null)}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors"
-            >
-              ✕ {t('mockClose')}
-            </button>
-          </div>
-          <div className="bg-slate-100 p-2 sm:p-4">
-            {htmlLoading ? (
-              <div className="h-96 flex items-center justify-center text-slate-400">
-                Yuklanmoqda…
-              </div>
-            ) : (
-              <iframe
-                title={current.title}
-                srcDoc={html}
-                sandbox="allow-scripts allow-popups allow-forms allow-modals"
-                className="w-full h-[70vh] min-h-[480px] rounded-xl bg-white border-0"
-              />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

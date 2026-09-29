@@ -19,6 +19,7 @@ import SiteLayout from './site/SiteLayout';
 import Home from './site/Home';
 import SubjectPage from './site/SubjectPage';
 import FullMock from './site/FullMock';
+import MockViewer from './site/MockViewer';
 import NotFound from './site/NotFound';
 import AdminPanel from './site/AdminPanel';
 import { isAdminSession, clearAdminToken, ADMIN_USER } from './admin';
@@ -126,6 +127,11 @@ function App() {
           <Route
             path={SITE_PATHS.fullMock}
             element={requireAuth(<FullMock />)}
+          />
+
+          <Route
+            path="/full-mock/view/:id"
+            element={requireAuth(<MockViewer />)}
           />
 
           <Route

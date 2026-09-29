@@ -9,8 +9,9 @@ import {
 } from '../admin';
 import { SITE_PATHS } from '../sitePaths';
 import UsersManager from './UsersManager';
+import MocksManager from './MocksManager';
 
-type Tab = 'users' | 'requests';
+type Tab = 'users' | 'requests' | 'mocks';
 
 const fmtDate = (v: string) => {
   try {
@@ -132,6 +133,7 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
           {(
             [
               { key: "users" as Tab, label: "👥 Akkauntlar" },
+              { key: "mocks" as Tab, label: "📄 Mocklar" },
               { key: "requests" as Tab, label: "📨 Kurs so'rovlari" },
             ]
           ).map((x) => (
@@ -155,9 +157,11 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
 
-        {tab === "users" ? (
-          <UsersManager onChanged={loadStats} />
-        ) : (
+        {tab === "users" && <UsersManager onChanged={loadStats} />}
+
+        {tab === "mocks" && <MocksManager onChanged={loadStats} />}
+
+        {tab === "requests" && (
           <div className="space-y-3">
             {requests.length === 0 && (
               <div className="rounded-2xl bg-white ring-1 ring-slate-200/80 p-10 text-center text-slate-400">
