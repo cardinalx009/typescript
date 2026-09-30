@@ -10,17 +10,37 @@ let scriptPromise: Promise<void> | null = null;
 
 const loadGoogleScript = (): Promise<void> => {
   if (window.google?.accounts?.id) return Promise.resolve();
-  if (!scriptPromise) {
-    scriptPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.async = true;
-      s.defer = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('Google script yuklanmadi'));
-      document.head.appendChild(s);
-    });
-  }
+  if (scriptPromise) return scriptPromise;
+
+  scriptPromise = new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    // Yuklash uzoq cho'zilsa (tarmoq sekin / bloklangan bo'lsa) —
+    // cheksiz kutib qolmaslik uchun timeout
+    const timer = setTimeout(() => {
+      s.remove();
+      reject(new Error('Google script yuklanmadi (timeout)'));
+    }, 15000);
+
+    s.onload = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    s.onerror = () => {
+      clearTimeout(timer);
+      s.remove();
+      reject(new Error('Google script yuklanmadi (tarmoq xatosi)'));
+    };
+    document.head.appendChild(s);
+  }).catch((err) => {
+    // Muhim: xato bo'lganda promise'ni tozalash kerak, aks holda
+    // butun sessiya davomida barcha urinishlar rad etilgan bo'lib qoladi
+    scriptPromise = null;
+    throw err;
+  });
+
   return scriptPromise;
 };
 

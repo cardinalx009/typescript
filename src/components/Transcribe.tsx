@@ -59,7 +59,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const lastShiftFireRef = useRef(0);
+  const lastAltFireRef = useRef(0);
   const lastProgressSaveRef = useRef(0);
   const transcriptDebounceRef = useRef<number | null>(null);
   const audioNameDebounceRef = useRef<number | null>(null);
@@ -162,10 +162,10 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
     if (!stepOne) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Shift' && e.location === 1) {
+      if (e.key === 'Alt' && e.location === 1) {
         const now = Date.now();
-        if (now - lastShiftFireRef.current < 150) return;
-        lastShiftFireRef.current = now;
+        if (now - lastAltFireRef.current < 150) return;
+        lastAltFireRef.current = now;
         e.preventDefault();
         togglePlay();
       }
@@ -740,7 +740,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
                   <div className="flex items-start gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs sm:text-sm text-blue-800 mt-1">
                     <span className="text-base flex-shrink-0">⌨️</span>
                     <div className="flex-1">
-                      <strong>Left Shift</strong> — Pause/Play •{' '}
+                      <strong>Left Alt</strong> — Pause/Play •{' '}
                       <strong>Ctrl + Enter</strong> — 5 son. orqaga • Barchasi avtomatik saqlanadi.{' '}
                       <button
                         type="button"
@@ -875,7 +875,7 @@ export default function Transcribe({ user, onLogout }: TranscribeProps) {
                 <div className="bg-white/85 backdrop-blur rounded-xl p-4 border border-white/40 shadow">
                   <div className="text-2xl mb-1">⌨️</div>
                   <div className="font-semibold text-gray-800 text-sm">
-                    {isDesktop ? 'Left Shift = Pause' : 'Katta Pause tugma'}
+                    {isDesktop ? 'Left Alt = Pause' : 'Katta Pause tugma'}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     {isDesktop
